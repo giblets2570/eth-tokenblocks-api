@@ -2,13 +2,13 @@ import random, os, json, arrow
 from chalice import Chalice, Response, NotFoundError, ForbiddenError
 from database import Database
 from truelayer import Truelayer
+from passlib.hash import pbkdf2_sha256
+import jwt
 
 contract_folder = os.environ.get('CONTRACT_FOLDER', None)
 assert contract_folder != None
 
-app = Chalice(app_name='giftcard-api')
-
-
+app = Chalice(app_name='ett-api')
 
 from web3 import Web3, contract
 
@@ -29,6 +29,20 @@ def refresh_user_token(user):
     Truelayer.get_refresh_token(user)
   )
   return Database.find_one("User", {'id': user["id"]})
+
+
+def loggedin_middleware(func):
+  def wrapper(*args, **kwargs):
+    headers = app.current_request.headers
+    authorization = headers['authorization'].replace('Bearer ', '')
+    try:
+      result = jwt.decode(authorization, 'secret', algorithms=['HS256'])
+      print(result)
+      return func(*args, **kwargs)
+    except Exception as e:
+      print(e)
+      raise e
+  return wrapper
 
 @app.route('/truelayer')
 def truelayer():
@@ -86,6 +100,68 @@ def truelayer_callback():
 
   return result
 
+@app.route('/auth/signup', cors=True, methods=['POST'])
+def auth_signup():
+  request = app.current_request
+  data = request.json_body
+
+  address = data['address']
+  name = data['name']
+  password = data['password']
+  
+  user = Database.find_one("User", {
+    'name': name,
+    'address': Web3.toChecksumAddress(address),
+  })
+  if not user:
+    password_hash = pbkdf2_sha256.hash(password)
+    Database.insert("User", {
+      'name': name,
+      'password': password_hash,
+      'address': address
+    })
+    user = Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
+  return {
+    'id': user['id'],
+    'name': user['name'],
+    'address': user['address']
+  }
+
+@app.route('/auth/login', cors=True, methods=['POST'])
+def auth_login():
+  request = app.current_request
+  data = request.json_body
+
+  address = data['address']
+  name = data['name']
+  password = data['password']
+  
+  user = Database.find_one("User", {
+    'name': Web3.toChecksumAddress(name),
+    'address': Web3.toChecksumAddress(address),
+  })
+  if not user: raise NotFoundError('user not found with name {}'.format(name))
+
+  if not pbkdf2_sha256.verify(password, user['password_hash']): raise ForbiddenError('Wrong password')
+
+  token = jwt.encode({
+      'id': user['id'],
+      'name': user['name'],
+      'address': user['address']
+    }, 
+    'secret', 
+    algorithm='HS256'
+  )
+
+  return {
+    'user': {
+      'id': user['id'],
+      'name': user['name'],
+      'address': user['address']
+    },
+    'token': token
+  }
+
 @app.route('/user/{address}', cors=True, methods=['GET'])
 def user_get(address):
   user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
@@ -135,22 +211,18 @@ def checkKyc(address):
 
 @app.route('/accounts/{address}/check-balance')
 def checkBalance(address):
-  try:
-    request = app.current_request
-    amount = int(request.query_params['amount'])
+  request = app.current_request
+  amount = int(request.query_params['amount'])
 
-    user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
-    if not user: raise NotFoundError('user not found with address {}'.format(address))
+  user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
+  if not user: raise NotFoundError('user not found with address {}'.format(address))
 
-    user = refresh_user_token(user)
-    balance = Truelayer.get_balance(user)
-    
-    balance_small = int(balance['available'] * 100)
+  user = refresh_user_token(user)
+  balance = Truelayer.get_balance(user)
+  
+  balance_small = int(balance['available'] * 100)
 
-    if(balance_small < amount):
-      raise ForbiddenError('Not enough funds')
-    else:
-      return {'message': 'Has funds', 'status': 200}
-  except Exception as e:
-    print(e)
-    raise e
+  if(balance_small < amount):
+    raise ForbiddenError('Not enough funds')
+  else:
+    return {'message': 'Has funds', 'status': 200}
