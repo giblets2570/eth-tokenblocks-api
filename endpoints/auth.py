@@ -5,7 +5,7 @@ from passlib.hash import pbkdf2_sha256
 import jwt
 from web3 import Web3
 
-
+web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
 def seedData():
   user = Database.find_one("User", {'role': 'broker'})
@@ -14,10 +14,19 @@ def seedData():
     Database.insert("User", {
       'name': 'broker',
       'password': password_hash,
-      'address': '0x1bbf9F9429202f6C95B1890abfeF0e09595D3c2F',
+      'address': web3.eth.accounts[3],
       'role': 'broker'
     })
-# Database.clean_table('User')
+  user = Database.find_one("User", {'role': 'investor'})
+  if not user:
+    password_hash = pbkdf2_sha256.hash('investor')
+    Database.insert("User", {
+      'name': 'investor',
+      'password': password_hash,
+      'address': web3.eth.accounts[2],
+      'role': 'investor'
+    })
+Database.clean_table('User')
 seedData()
 
 def to_object(model, keys):
