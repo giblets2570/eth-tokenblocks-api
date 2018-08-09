@@ -9,6 +9,38 @@ def to_object(model, keys):
   return output
 
 def User(app):
+
+  def loggedin_middleware(func):
+    def wrapper(*args, **kwargs):
+      headers = app.current_request.headers
+      authorization = headers['authorization'].replace('Bearer ', '')
+      try:
+        result = jwt.decode(authorization, 'secret', algorithms=['HS256'])
+        return func(*args, **kwargs)
+      except Exception as e:
+        print(e)
+        raise e
+    return wrapper
+
+  @app.route('/users', cors=True, methods=['GET'])
+  # @loggedin_middleware
+  def users_get():
+    try:
+      request = app.current_request
+      users = None
+      if 'role' in request.query_params:
+        role = request.query_params['role']
+        users = Database.find("User", {'role': role})
+      else:
+        users = Database.find("User")
+      print(users)
+      users = [to_object(u, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature']) for u in users]
+      print(users)
+      return users
+    except Exception as e:
+      print(e)
+      raise e
+
   @app.route('/users/{user_id}', cors=True, methods=['PUT'])
   def user_put(user_id):
     request = app.current_request
@@ -16,13 +48,17 @@ def User(app):
     user = Database.find_one("User", {'id': int(user_id)})
     if not user: raise NotFoundError('user not found with id {}'.format(user_id))
     Database.update('User', {'id': user['id']}, data)
-    return { 'message': 'Done' }
+    return {'message':'Done'}
 
   @app.route('/users/{address}/bundle', cors=True)
   def accounts(address):
-    user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
-    if not user: raise NotFoundError('user not found with address {}'.format(address))
-    return to_object(user, ['ik', 'spk', 'signature'])
+    try:
+      user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
+      if not user: raise NotFoundError('user not found with address {}'.format(address))
+      return to_object(user, ['ik', 'spk', 'signature'])
+    except Exception as e:
+      print(e)
+      raise e
 
   @app.route('/accounts/{address}/check-kyc')
   def checkKyc(address):

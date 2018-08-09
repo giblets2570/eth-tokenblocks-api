@@ -8,16 +8,25 @@ from web3 import Web3
 web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
 def seedData():
-  user = Database.find_one("User", {'role': 'broker'})
+  user = Database.find_one("User", {'name': 'broker1'})
   if not user:
-    password_hash = pbkdf2_sha256.hash('broker')
+    password_hash = pbkdf2_sha256.hash('broker1')
     Database.insert("User", {
-      'name': 'broker',
+      'name': 'broker1',
+      'password': password_hash,
+      'address': web3.eth.accounts[1],
+      'role': 'broker'
+    })
+  user = Database.find_one("User", {'name': 'broker2'})
+  if not user:
+    password_hash = pbkdf2_sha256.hash('broker2')
+    Database.insert("User", {
+      'name': 'broker2',
       'password': password_hash,
       'address': web3.eth.accounts[3],
       'role': 'broker'
     })
-  user = Database.find_one("User", {'role': 'investor'})
+  user = Database.find_one("User", {'name': 'investor'})
   if not user:
     password_hash = pbkdf2_sha256.hash('investor')
     Database.insert("User", {
@@ -26,7 +35,8 @@ def seedData():
       'address': web3.eth.accounts[2],
       'role': 'investor'
     })
-Database.clean_table('User')
+
+# Database.clean_table('User')
 seedData()
 
 def to_object(model, keys):
