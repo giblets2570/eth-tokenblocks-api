@@ -19,7 +19,9 @@ class Database(object):
     def clean_table(cls, table_name):
       connection = create_connection()
       with connection.cursor() as cursor:
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
         cursor.execute("TRUNCATE TABLE {}".format(table_name))
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
         connection.commit()
       connection.close()
 
@@ -71,7 +73,9 @@ class Database(object):
         
         wheres = " AND ".join((["`{}`=%s".format(k) for k in keys]))
 
-        sql = "SELECT {} FROM `{}` WHERE {}".format(return_filter_values, table_name, wheres)
+
+        sql = "SELECT {} FROM `{}`".format(return_filter_values, table_name)
+        if wheres: sql += " WHERE {}".format(wheres)
         cursor.execute(sql, values)
 
         result = cursor.fetchall()
@@ -91,8 +95,9 @@ class Database(object):
 
         setter = ', '.join(["{}=%s".format(k) for k in data_keys])
 
-        sql = "UPDATE `{}` SET {} WHERE {}".format(table_name, setter, wheres)
-
+        sql = "UPDATE `{}` SET {}".format(table_name, setter)
+        if wheres: sql += " WHERE {}".format(wheres)
         cursor.execute(sql, data_values + query_values)
+        
         connection.commit()
       connection.close()

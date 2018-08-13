@@ -1,4 +1,5 @@
 from database import Database
+from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3
 
@@ -6,10 +7,11 @@ def to_object(model, keys):
   output = dict()
   for key in keys:
     output[key] = model[key]
+    if(type(output[key]) == datetime):
+      output[key] = output[key].timestamp()
   return output
 
 def User(app):
-
   def loggedin_middleware(func):
     def wrapper(*args, **kwargs):
       headers = app.current_request.headers
@@ -25,21 +27,16 @@ def User(app):
   @app.route('/users', cors=True, methods=['GET'])
   # @loggedin_middleware
   def users_get():
-    try:
-      request = app.current_request
-      users = None
-      if 'role' in request.query_params:
-        role = request.query_params['role']
-        users = Database.find("User", {'role': role})
-      else:
-        users = Database.find("User")
-      print(users)
-      users = [to_object(u, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature']) for u in users]
-      print(users)
-      return users
-    except Exception as e:
-      print(e)
-      raise e
+    request = app.current_request
+    users = None
+    if 'role' in request.query_params:
+      role = request.query_params['role']
+      users = Database.find("User", {'role': role})
+      users = [u for u in users if u['ik']]
+    else:
+      users = Database.find("User")
+    users = [to_object(u, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature']) for u in users]
+    return users
 
   @app.route('/users/{user_id}', cors=True, methods=['PUT'])
   def user_put(user_id):
