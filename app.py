@@ -46,6 +46,7 @@ def seedData():
       'role': 'investor'
     })
 
+# Database.clean_table('Token')
 # Database.clean_table('OrderBroker')
 # Database.clean_table('`Order`')
 # Database.clean_table('User')

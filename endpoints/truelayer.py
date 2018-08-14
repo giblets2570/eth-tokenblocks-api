@@ -17,6 +17,9 @@ with open(contract_folder + 'Registry.json') as file:
     abi=data['abi']
   )
 
+  wis = registry_contract.functions.isAdmin(web3.eth.accounts[0]).call({'from': web3.eth.accounts[0]})
+  print(wis)
+
 def refresh_user_token(user):
   Database.update(
     'User', 

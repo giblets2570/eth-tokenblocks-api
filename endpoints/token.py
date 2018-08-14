@@ -39,15 +39,30 @@ def Token(app):
       token_data = {
         'name': data['name'],
         'symbol': data['symbol'],
-        'address': data['tokenAddress'],
         'decimals': data['decimals'],
         'cutoff_time': data['cutoffTime']
       }
       token = Database.find_one("Token", token_data)
-      if not token:
+      token_data['address'] = data['tokenAddress']
+      
+      if token:
+        Database.update("Token", {'id': token['id']}, token_data)
+      else:
         Database.insert("Token", token_data)
-        token = Database.find_one("Token", token_data)
-      token = to_object(token, ['name','symbol','address','decimals','cutoff_time'])
+
+      token = Database.find_one("Token", token_data)
+
+      with open(contract_folder + 'TokenFactory.json') as file:
+        data = json.loads(file.read())
+        network = list(data['networks'].keys())[0]
+        token_factory_contract = web3.eth.contract(
+          address=Web3.toChecksumAddress(data['networks'][network]['address']),
+          abi=data['abi']
+        )
+        create_order_address = token_factory_contract.functions.tokenToCreateOrder(Web3.toChecksumAddress(token['address'])).call()
+        Database.update("Token", {'id': token['id']}, {'create_order_address': Web3.toChecksumAddress(create_order_address)})
+
+      token = to_object(token, ['name','symbol','address','create_order_address','decimals','cutoff_time'])
       return token
     except Exception as e:
       print(e)
@@ -58,5 +73,5 @@ def Token(app):
     request = app.current_request
     tokens = Database.find("Token", {})
     print(tokens)
-    tokens = [to_object(u, ['name','symbol','address','decimals','cutoff_time']) for u in tokens]
+    tokens = [to_object(u, ['name','symbol','address','create_order_address','decimals','cutoff_time']) for u in tokens]
     return tokens
