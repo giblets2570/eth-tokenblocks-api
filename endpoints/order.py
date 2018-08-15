@@ -3,6 +3,7 @@ from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3
 import jwt, os, json
+from utilities import loggedin_middleware, to_object
 
 contract_folder = os.environ.get('CONTRACT_FOLDER', None)
 assert contract_folder != None
@@ -14,34 +15,14 @@ with open(contract_folder + 'CreateOrder.json') as file:
 def decode(s):
   return ''.join('%02x' % ord(c) for c in str(s))
 
-def to_object(model, keys):
-  output = dict()
-  for key in keys:
-    output[key] = model[key]
-    if(type(output[key]) == datetime):
-      output[key] = output[key].timestamp()
-  return output
-
 def Order(app):
-  def loggedin_middleware(func):
-    def wrapper(*args, **kwargs):
-      headers = app.current_request.headers
-      if 'authorization' not in headers: raise ForbiddenError('Not authorized')
-      authorization = headers['authorization'].replace('Bearer ', '')
-      try:
-        result = jwt.decode(authorization, 'secret', algorithms=['HS256'])
-        setattr(app.current_request, 'user', result)
-        return func(*args, **kwargs)
-      except Exception as e:
-        print(e)
-        raise e
-    return wrapper
 
   @app.route('/orders', cors=True, methods=['POST'])
   def orders_post():
     try:
       request = app.current_request
       data = request.json_body
+      print(data)
       investor = Database.find_one("User", {'address': Web3.toChecksumAddress(data['investor'])})
 
       token = Database.find_one("Token", {'create_order_address': Web3.toChecksumAddress(data['createOrderAddress'])})
@@ -90,7 +71,7 @@ def Order(app):
           'amount': order_broker_contract[3].hex(),
           'ik': '04'+order_broker_contract[4].hex()+order_broker_contract[5].hex(),
           'ek': '04'+order_broker_contract[6].hex()+order_broker_contract[7].hex(),
-          'price': order_broker_contract[8].hex(),
+          'price': order_broker_contract[8],
           'state': order_broker_contract[9]
         }
         
@@ -104,25 +85,43 @@ def Order(app):
       raise e
 
   @app.route('/orders', cors=True, methods=['GET'])
-  @loggedin_middleware
+  @loggedin_middleware(app)
   def orders_get():
     request = app.current_request
-    orders = None
+    orders = []
+    order_brokers = []
     query = request.query_params or {}
-    query['investor_id'] = request.user['id']
-    orders = Database.find("Order", query)
+    if request.user['role'] == 'investor':
+      query['investor_id'] = request.user['id']
+      orders = Database.find("Order", query)
+    elif request.user['role'] == 'broker':
+      order_brokers = Database.find("OrderBroker", {'broker_id': request.user['id']})
+      order_ids = [order_broker['order_id'] for order_broker in order_brokers]
+      for i, order_id in enumerate(order_ids):
+        query['id'] = order_id
+        order = Database.find_one("Order", query)
+        if order:
+          order['order_brokers'] = [order_brokers[i]]
+          orders += [order]
+
+    # Attached tokens
     token_ids = list(set([o['token_id'] for o in orders]))
     tokens = [Database.find_one("Token", {'id': t}) for t in token_ids]
     tokens = [to_object(t, ['id','create_order_address','address','cutoff_time','symbol','name','decimals']) for t in tokens]
     tokens_hash = {token['id']: token for token in tokens}
     for order in orders:
       order['token'] = tokens_hash[order['token_id']]
-    orders = [to_object(u, ['id','create_order_address','order_index','investor_id','created_at','state', 'token']) for u in orders]
-    print(orders)
+      if request.user['role'] == 'investor':
+        order_brokers = Database.find('OrderBroker', {'order_id': order['id']})
+        for order_broker in order_brokers:
+          order_broker['broker'] = Database.find_one('User', {'id': order_broker['broker_id']}, ['address', 'id','name'])
+        order['order_brokers'] = order_brokers
+
+    orders = [to_object(u, ['id','create_order_address','order_index','investor_id','created_at','state', 'token', 'order_brokers']) for u in orders]
     return orders
 
   @app.route('/orders/{order_id}', cors=True, methods=['GET'])
-  @loggedin_middleware
+  @loggedin_middleware(app)
   def orders_show(order_id):
     request = app.current_request
     data = request.json_body
@@ -133,7 +132,7 @@ def Order(app):
     order = to_object(order, ['id','create_order_address','order_index','investor_id','created_at','state','order_brokers'])
     return order
 
-  @app.route('/orders/{order_index}/state', cors=True, methods=['PUT'])
+  @app.route('/orders/{order_index}/set-price', cors=True, methods=['PUT'])
   def orders_update_state(order_index):
     request = app.current_request
     data = request.json_body
@@ -141,11 +140,48 @@ def Order(app):
       'Order', 
       {'order_index': int(order_index)}
     )
-    if(order['state'] < data['state']):
-      Database.find_one(
-        'Order', 
-        {'order_index': int(order_index)},
-        {'state': data['state']}
-      )
-      return {'message':'Done'}
-    return {'message':'Not updated'}
+    broker = Database.find_one(
+      'User',
+      {'address': Web3.toChecksumAddress(data['broker'])}
+    )
+    Database.update(
+      'OrderBroker', 
+      {'order_id': order['id'], 'broker_id': broker['id']},
+      {'price': data['price'][2:], 'state': 1}
+    )
+    return {'message':'Updated'}
+
+  @app.route('/orders/{order_index}/investor-confirm', cors=True, methods=['PUT'])
+  def orders_update_state(order_index):
+    request = app.current_request
+    data = request.json_body
+    order = Database.find_one(
+      'Order', 
+      {'order_index': int(order_index)}
+    )
+    Database.update(
+      'OrderBroker', 
+      {'order_id': order['id']},
+      {'state': 2}
+    )
+    return {'message':'Updated'}
+
+
+  @app.route('/orders/{order_index}/broker-confirm', cors=True, methods=['PUT'])
+  def orders_update_state(order_index):
+    request = app.current_request
+    data = request.json_body
+    order = Database.find_one(
+      'Order', 
+      {'order_index': int(order_index)}
+    )
+    broker = Database.find_one(
+      'User',
+      {'address': Web3.toChecksumAddress(data['broker'])}
+    )
+    Database.update(
+      'OrderBroker', 
+      {'order_id': order['id'], 'broker_id': broker['id']},
+      {'state': 3}
+    )
+    return {'message':'Updated'}

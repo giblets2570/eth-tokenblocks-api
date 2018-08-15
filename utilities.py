@@ -1,0 +1,25 @@
+from datetime import datetime
+import jwt
+
+def loggedin_middleware(app):
+  def outer(func):
+    def inner(*args, **kwargs):
+      headers = app.current_request.headers
+      authorization = headers['authorization'].replace('Bearer ', '')
+      try:
+        result = jwt.decode(authorization, 'secret', algorithms=['HS256'])
+        setattr(app.current_request, 'user', result)
+        return func(*args, **kwargs)
+      except Exception as e:
+        print(e)
+        raise e
+    return inner
+  return outer
+
+def to_object(model, keys):
+  output = dict()
+  for key in keys:
+    output[key] = model[key]
+    if(type(output[key]) == datetime):
+      output[key] = output[key].timestamp()
+  return output

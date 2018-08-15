@@ -4,16 +4,10 @@ from database import Database
 from datetime import datetime
 from chalice import Response, NotFoundError
 from web3 import Web3
+from utilities import loggedin_middleware, to_object
 import jwt
-web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
-def to_object(model, keys):
-  output = dict()
-  for key in keys:
-    output[key] = model[key]
-    if(type(output[key]) == datetime):
-      output[key] = output[key].timestamp()
-  return output
+web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
 def Auth(app):
   @app.route('/auth/signup', cors=True, methods=['POST'])
@@ -43,7 +37,6 @@ def Auth(app):
 
   @app.route('/auth/login', cors=True, methods=['POST'])
   def auth_login():
-
     try:
       request = app.current_request
       data = request.json_body

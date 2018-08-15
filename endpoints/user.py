@@ -2,6 +2,7 @@ from database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3
+from utilities import loggedin_middleware
 
 def to_object(model, keys):
   output = dict()
@@ -12,17 +13,6 @@ def to_object(model, keys):
   return output
 
 def User(app):
-  def loggedin_middleware(func):
-    def wrapper(*args, **kwargs):
-      headers = app.current_request.headers
-      authorization = headers['authorization'].replace('Bearer ', '')
-      try:
-        result = jwt.decode(authorization, 'secret', algorithms=['HS256'])
-        return func(*args, **kwargs)
-      except Exception as e:
-        print(e)
-        raise e
-    return wrapper
 
   @app.route('/users', cors=True, methods=['GET'])
   # @loggedin_middleware
@@ -37,6 +27,13 @@ def User(app):
       users = Database.find("User")
     users = [to_object(u, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature']) for u in users]
     return users
+
+  @app.route('/users/{user_id}', cors=True, methods=['GET'])
+  def user_get(user_id):
+    request = app.current_request
+    user = Database.find_one("User", {'id': int(user_id)})
+    if not user: raise NotFoundError('user not found with id {}'.format(user_id))
+    return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature'])
 
   @app.route('/users/{user_id}', cors=True, methods=['PUT'])
   def user_put(user_id):
