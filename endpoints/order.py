@@ -128,8 +128,15 @@ def Order(app):
     order = Database.find_one('Order', {'id': int(order_id)})
     if not order: raise NotFoundError('order not found with id {}'.format(order_id))
     
-    order['order_brokers'] = Database.find('OrderBroker', {'order_id': order['id']})
-    order = to_object(order, ['id','create_order_address','order_index','investor_id','created_at','state','order_brokers'])
+    token = Database.find_one("Token", {'id': order['token_id']})
+    token = to_object(token, ['id','create_order_address','address','cutoff_time','symbol','name','decimals'])
+    order['token'] = token
+
+    order_brokers = Database.find('OrderBroker', {'order_id': order['id']})
+    for order_broker in order_brokers:
+      order_broker['broker'] = Database.find_one('User', {'id': order_broker['broker_id']}, ['address', 'id','name'])
+    order['order_brokers'] = order_brokers
+    order = to_object(order, ['id','create_order_address','order_index','investor_id','created_at','state','token','order_brokers'])
     return order
 
   @app.route('/orders/{order_index}/set-price', cors=True, methods=['PUT'])
