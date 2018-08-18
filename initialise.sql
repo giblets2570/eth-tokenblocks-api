@@ -3,6 +3,7 @@ USE `ett` ;
 
 DROP TABLE IF EXISTS OrderBroker;
 DROP TABLE IF EXISTS `Order`;
+DROP TABLE IF EXISTS TokenHolding;
 DROP TABLE IF EXISTS Token;
 DROP TABLE IF EXISTS User;
 
@@ -31,6 +32,15 @@ CREATE TABLE Token (
     name VARCHAR(50),
     decimals INT(6),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE TokenHolding (
+    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    ticker VARCHAR(50),
+    percent VARCHAR(50),
+    token_id INT(6) UNSIGNED,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (token_id) REFERENCES Token(id)
 );
 
 CREATE TABLE `Order` (

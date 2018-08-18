@@ -12,44 +12,89 @@ web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 def Token(app):
   @app.route('/tokens', cors=True, methods=['POST'])
   def tokens_post():
-    try:
-      request = app.current_request
-      data = request.json_body
-      token_data = {
-        'name': data['name'],
-        'symbol': data['symbol'],
-        'decimals': data['decimals'],
-        'cutoff_time': data['cutoffTime']
-      }
-      token = Database.find_one("Token", token_data)
-      token_data['address'] = data['tokenAddress']
-      
-      if token:
-        Database.update("Token", {'id': token['id']}, token_data)
-      else:
-        Database.insert("Token", token_data)
+    request = app.current_request
+    data = request.json_body
+    token_data = {
+      'name': data['name'],
+      'symbol': data['symbol'],
+      'decimals': data['decimals'],
+      'cutoff_time': data['cutoffTime']
+    }
+    token = Database.find_one("Token", token_data)
+    token_data['address'] = data['tokenAddress']
+    
+    if token:
+      Database.update("Token", {'id': token['id']}, token_data)
+    else:
+      Database.insert("Token", token_data)
 
-      token = Database.find_one("Token", token_data)
+    token = Database.find_one("Token", token_data)
 
-      with open(contract_folder + 'TokenFactory.json') as file:
-        data = json.loads(file.read())
-        network = list(data['networks'].keys())[0]
-        token_factory_contract = web3.eth.contract(
-          address=Web3.toChecksumAddress(data['networks'][network]['address']),
-          abi=data['abi']
-        )
-        create_order_address = token_factory_contract.functions.tokenToCreateOrder(Web3.toChecksumAddress(token['address'])).call()
-        Database.update("Token", {'id': token['id']}, {'create_order_address': Web3.toChecksumAddress(create_order_address)})
+    with open(contract_folder + 'TokenFactory.json') as file:
+      data = json.loads(file.read())
+      network = list(data['networks'].keys())[0]
+      token_factory_contract = web3.eth.contract(
+        address=Web3.toChecksumAddress(data['networks'][network]['address']),
+        abi=data['abi']
+      )
+      create_order_address = token_factory_contract.functions.tokenToCreateOrder(Web3.toChecksumAddress(token['address'])).call()
+      Database.update("Token", {'id': token['id']}, {'create_order_address': Web3.toChecksumAddress(create_order_address)})
 
-      token = to_object(token, ['name','symbol','address','create_order_address','decimals','cutoff_time'])
-      return token
-    except Exception as e:
-      print(e)
-      raise e
+    token = to_object(token, ['id','name','symbol','address','create_order_address','decimals','cutoff_time'])
+    return token
 
   @app.route('/tokens', cors=True, methods=['GET'])
   def tokens_get():
     request = app.current_request
     tokens = Database.find("Token", {})
-    tokens = [to_object(u, ['name','symbol','address','create_order_address','decimals','cutoff_time']) for u in tokens]
+    tokens = [to_object(u, ['id','name','symbol','address','create_order_address','decimals','cutoff_time']) for u in tokens]
     return tokens
+
+  @app.route('/tokens/{token_id}', cors=True, methods=['GET'])
+  def token_get(token_id):
+    request = app.current_request
+    token = Database.find_one('Token', {'id': int(token_id)})
+    if not token: raise NotFoundError('token not found with id {}'.format(token_id))
+    token = to_object(token, ['id','name','symbol','address','create_order_address','decimals','cutoff_time'])
+    return token
+
+
+  @app.route('/tokens/{token_id}/holdings', cors=True, methods=['GET'])
+  def token_get_holdings(token_id):
+    try:
+      request = app.current_request
+      token = Database.find_one('Token', {'id': int(token_id)})
+      if not token: raise NotFoundError('token not found with id {}'.format(token_id))
+      token_holdings = Database.find('TokenHolding', {'token_id': token['id']})
+      token_holdings = [to_object(t, ['id', 'ticker', 'percent', 'created_at']) for t in token_holdings]
+      return token_holdings
+    except Exception as e:
+      print(e)
+      raise e
+
+  @app.route('/tokens/holdings-removed', cors=True, methods=['POST'])
+  def token_holdings_removed():
+    request = app.current_request
+    data = request.json_body
+    token = Database.find_one('Token', {'address': data['tokenAddress']})
+    if not token: raise NotFoundError('token not found with address {}'.format(data['tokenAddress']))
+
+    Database.remove('TokenHolding', {'token_id': token['id']})
+    return {'message': 'deleted'}
+
+  @app.route('/tokens/holding-added', cors=True, methods=['POST'])
+  def token_holding_added():
+    request = app.current_request
+    data = request.json_body
+    token = Database.find_one('Token', {'address': data['tokenAddress']})
+    if not token: raise NotFoundError('token not found with address {}'.format(data['tokenAddress']))
+    percent = data['percent']
+    ticker = Web3.toBytes(hexstr=data['ticker']).decode("utf-8")
+    token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
+    if token_holding:
+      Database.update('TokenHolding', {'id': token_holding['id']}, {'percent': percent})
+    else:
+      Database.insert('TokenHolding', {'percent': percent, 'ticker': ticker, 'token_id': token['id']})
+    token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
+    return to_object(token_holding, ['id', 'ticker', 'percent', 'created_at'])
+

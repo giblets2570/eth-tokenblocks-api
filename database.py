@@ -101,3 +101,17 @@ class Database(object):
         
         connection.commit()
       connection.close()
+
+    @classmethod
+    def remove(cls, table_name, query):
+      connection = create_connection()
+      with connection.cursor() as cursor:
+        keys = query.keys()
+        values = tuple([query[k] for k in keys])
+        
+        wheres = " AND ".join((["`{}`=%s".format(k) for k in keys]))
+
+        sql = "DELETE FROM `{}`".format(table_name)
+        if wheres: sql += " WHERE {}".format(wheres)
+        cursor.execute(sql, values)
+      connection.close()
