@@ -22,14 +22,11 @@ def Token(app):
     }
     token = Database.find_one("Token", token_data)
     token_data['address'] = data['tokenAddress']
-    
     if token:
       Database.update("Token", {'id': token['id']}, token_data)
     else:
       Database.insert("Token", token_data)
-
     token = Database.find_one("Token", token_data)
-
     with open(contract_folder + 'TokenFactory.json') as file:
       data = json.loads(file.read())
       network = list(data['networks'].keys())[0]
@@ -39,7 +36,6 @@ def Token(app):
       )
       create_order_address = token_factory_contract.functions.tokenToCreateOrder(Web3.toChecksumAddress(token['address'])).call()
       Database.update("Token", {'id': token['id']}, {'create_order_address': Web3.toChecksumAddress(create_order_address)})
-
     token = to_object(token, ['id','name','symbol','address','create_order_address','decimals','cutoff_time'])
     return token
 
@@ -58,19 +54,14 @@ def Token(app):
     token = to_object(token, ['id','name','symbol','address','create_order_address','decimals','cutoff_time'])
     return token
 
-
   @app.route('/tokens/{token_id}/holdings', cors=True, methods=['GET'])
   def token_get_holdings(token_id):
-    try:
-      request = app.current_request
-      token = Database.find_one('Token', {'id': int(token_id)})
-      if not token: raise NotFoundError('token not found with id {}'.format(token_id))
-      token_holdings = Database.find('TokenHolding', {'token_id': token['id']})
-      token_holdings = [to_object(t, ['id', 'ticker', 'percent', 'created_at']) for t in token_holdings]
-      return token_holdings
-    except Exception as e:
-      print(e)
-      raise e
+    request = app.current_request
+    token = Database.find_one('Token', {'id': int(token_id)})
+    if not token: raise NotFoundError('token not found with id {}'.format(token_id))
+    token_holdings = Database.find('TokenHolding', {'token_id': token['id']})
+    token_holdings = [to_object(t, ['id', 'ticker', 'percent', 'created_at']) for t in token_holdings]
+    return token_holdings
 
   @app.route('/tokens/holdings-removed', cors=True, methods=['POST'])
   def token_holdings_removed():
@@ -78,7 +69,6 @@ def Token(app):
     data = request.json_body
     token = Database.find_one('Token', {'address': data['tokenAddress']})
     if not token: raise NotFoundError('token not found with address {}'.format(data['tokenAddress']))
-
     Database.remove('TokenHolding', {'token_id': token['id']})
     return {'message': 'deleted'}
 

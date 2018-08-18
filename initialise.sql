@@ -50,7 +50,9 @@ CREATE TABLE `Order` (
     investor_id INT(6) UNSIGNED,
     token_id INT(6) UNSIGNED,
     state INT(6) UNSIGNED,
+    broker_id INT(6) UNSIGNED,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (broker_id) REFERENCES User(id),
     FOREIGN KEY (investor_id) REFERENCES User(id),
     FOREIGN KEY (token_id) REFERENCES Token(id)
 );

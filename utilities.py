@@ -23,3 +23,7 @@ def to_object(model, keys):
     if(type(output[key]) == datetime):
       output[key] = output[key].timestamp()
   return output
+
+
+def decode(s):
+  return "".join("%02x" % ord(c) for c in str(s))
