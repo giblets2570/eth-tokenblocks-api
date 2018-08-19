@@ -21,16 +21,12 @@ def Order(app):
     data = request.json_body
 
     investor = Database.find_one("User", {"address": Web3.toChecksumAddress(data["investor"])})
-
     token = Database.find_one("Token", {"create_order_address": Web3.toChecksumAddress(data["createOrderAddress"])})
-    
     order_data = {
       "create_order_address": Web3.toChecksumAddress(data["createOrderAddress"]),
-      "order_index": int(data["index"]),
-      "investor_id": investor["id"],
+      "order_index": int(data["index"]), "investor_id": investor["id"],
       "created_at": datetime.fromtimestamp(int(data["date"])),
-      "token_id": token["id"],
-      "state": 0
+      "token_id": token["id"], "state": 0
     }
     order = Database.find_one("Order", order_data)
     if not order:
@@ -56,7 +52,7 @@ def Order(app):
         order_broker = Database.find_one("OrderBroker", order_broker_data)
       
       order_broker_contract = create_order_contract.functions.getOrderBrokers(
-        order["order_index"], 
+        order["order_index"],
         Web3.toChecksumAddress(_broker)
       ).call({
         "from": web3.eth.accounts[0]
@@ -69,6 +65,8 @@ def Order(app):
         "price": order_broker_contract[8],
         "state": order_broker_contract[9]
       }
+      print(broker)
+      print(order_broker_contract)
       
       Database.update("OrderBroker", {"id": order_broker["id"]}, order_broker_contract)
 
@@ -155,35 +153,50 @@ def Order(app):
       {"order_id": order["id"], "broker_id": broker["id"]},
       {"price": data["price"][2:], "state": 1}
     )
-    return {"message":"Updated"}
+    order = to_object(order, ["id","create_order_address","order_index","investor_id","created_at","state"])
+    return order
 
   @app.route("/orders/{order_index}/investor-confirm", cors=True, methods=["PUT"])
   def orders_update_state(order_index):
     request = app.current_request
     data = request.json_body
+    token = Database.find_one(
+      "Token", 
+      {"create_order_address": Web3.toChecksumAddress(data["createOrderAddress"])}
+    )
     order = Database.find_one(
       "Order", 
-      {"order_index": int(order_index)}
+      {"order_index": int(order_index), "token_id": token["id"]}
+    )
+    broker = Database.find_one(
+      "User", 
+      {"address": Web3.toChecksumAddress(data["broker"])}
     )
     Database.update(
       "Order", 
       {"id": order["id"]},
-      {"broker_id": Web3.toChecksumAddress(data["broker"])}
+      {"broker_id": broker['id']}
     )
     Database.update(
       "OrderBroker", 
-      {"order_id": order["id"], "broker_id": Web3.toChecksumAddress(data["broker"])},
+      {"order_id": order["id"], "broker_id": broker['id']},
       {"state": 2}
     )
-    return {"message":"Updated"}
+    order['broker_id'] = broker['id']
+    order = to_object(order, ["id","create_order_address","order_index","investor_id","created_at","state","broker_id"])
+    return order
 
   @app.route("/orders/{order_index}/broker-confirm", cors=True, methods=["PUT"])
   def orders_update_state(order_index):
     request = app.current_request
     data = request.json_body
+    token = Database.find_one(
+      "Token", 
+      {"create_order_address": Web3.toChecksumAddress(data["createOrderAddress"])}
+    )
     order = Database.find_one(
       "Order", 
-      {"order_index": int(order_index)}
+      {"order_index": int(order_index), "token_id": token["id"]}
     )
     broker = Database.find_one(
       "User",
@@ -194,4 +207,5 @@ def Order(app):
       {"order_id": order["id"], "broker_id": broker["id"]},
       {"state": 3}
     )
-    return {"message":"Updated"}
+    order = to_object(order, ["id","create_order_address","order_index","investor_id","created_at","state","broker_id"])
+    return order
