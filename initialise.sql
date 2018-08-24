@@ -1,5 +1,5 @@
 CREATE SCHEMA IF NOT EXISTS `ett` DEFAULT CHARACTER SET utf8 ;
-USE `ett` ;
+USE `ett`;
 
 DROP TABLE IF EXISTS OrderBroker;
 DROP TABLE IF EXISTS `Order`;
@@ -51,6 +51,7 @@ CREATE TABLE `Order` (
     token_id INT(6) UNSIGNED,
     state INT(6) UNSIGNED,
     broker_id INT(6) UNSIGNED,
+    execution_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (broker_id) REFERENCES User(id),
     FOREIGN KEY (investor_id) REFERENCES User(id),

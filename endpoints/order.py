@@ -62,11 +62,9 @@ def Order(app):
         "amount": order_broker_contract[3].hex(),
         "ik": "04"+order_broker_contract[4].hex()+order_broker_contract[5].hex(),
         "ek": "04"+order_broker_contract[6].hex()+order_broker_contract[7].hex(),
-        "price": order_broker_contract[8],
+        "price": order_broker_contract[8].hex(),
         "state": order_broker_contract[9]
       }
-      print(broker)
-      print(order_broker_contract)
       
       Database.update("OrderBroker", {"id": order_broker["id"]}, order_broker_contract)
 
@@ -119,7 +117,6 @@ def Order(app):
     data = request.json_body
     order = Database.find_one("Order", {"id": int(order_id)})
     if not order: raise NotFoundError("order not found with id {}".format(order_id))
-    
     investor = Database.find_one("User", {"id": order["investor_id"]}, ["address", "id","name"])
     order["investor"] = investor
     

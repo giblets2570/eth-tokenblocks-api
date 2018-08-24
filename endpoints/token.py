@@ -18,7 +18,7 @@ def Token(app):
       'name': data['name'],
       'symbol': data['symbol'],
       'decimals': data['decimals'],
-      'cutoff_time': data['cutoffTime']
+      'cutoff_time': datetime.fromtimestamp(int(data['cutoffTime']))
     }
     token = Database.find_one("Token", token_data)
     token_data['address'] = data['tokenAddress']
@@ -63,28 +63,30 @@ def Token(app):
     token_holdings = [to_object(t, ['id', 'ticker', 'percent', 'created_at']) for t in token_holdings]
     return token_holdings
 
-  @app.route('/tokens/holdings-removed', cors=True, methods=['POST'])
-  def token_holdings_removed():
-    request = app.current_request
-    data = request.json_body
-    token = Database.find_one('Token', {'address': data['tokenAddress']})
-    if not token: raise NotFoundError('token not found with address {}'.format(data['tokenAddress']))
-    Database.remove('TokenHolding', {'token_id': token['id']})
-    return {'message': 'deleted'}
 
-  @app.route('/tokens/holding-added', cors=True, methods=['POST'])
-  def token_holding_added():
+  @app.route('/tokens/{token_id}/holdings', cors=True, methods=['POST'])
+  def token_get_holdings(token_id):
     request = app.current_request
     data = request.json_body
-    token = Database.find_one('Token', {'address': data['tokenAddress']})
-    if not token: raise NotFoundError('token not found with address {}'.format(data['tokenAddress']))
-    percent = data['percent']
-    ticker = Web3.toBytes(hexstr=data['ticker']).decode("utf-8")
-    token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
-    if token_holding:
-      Database.update('TokenHolding', {'id': token_holding['id']}, {'percent': percent})
-    else:
-      Database.insert('TokenHolding', {'percent': percent, 'ticker': ticker, 'token_id': token['id']})
-    token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
-    return to_object(token_holding, ['id', 'ticker', 'percent', 'created_at'])
+    token = Database.find_one('Token', {'id': int(token_id)})
+    if not token: raise NotFoundError('token not found with id {}'.format(token_id))
+    holdings = data['holdings']
+    holdings_hash = {}
+    for h in holdings:
+      holdings_hash[h['ticker']] = h['percent']
+    tickers = list(holdings_hash.keys())
+    tickers.sort()
+    holdings_hash['tickers'] = tickers
+    return holdings_hash
+
+    # percent = data['percent']
+    # ticker = Web3.toBytes(hexstr=data['ticker']).decode("utf-8")
+    # token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
+    # if token_holding:
+    #   Database.update('TokenHolding', {'id': token_holding['id']}, {'percent': percent})
+    # else:
+    #   Database.insert('TokenHolding', {'percent': percent, 'ticker': ticker, 'token_id': token['id']})
+    # token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
+    # return to_object(token_holding, ['id', 'ticker', 'percent', 'created_at'])
+
 
