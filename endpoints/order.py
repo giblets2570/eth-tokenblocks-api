@@ -1,5 +1,5 @@
 from database import Database
-from datetime import datetime
+from datetime import datetime, date
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3
 import jwt, os, json
@@ -17,15 +17,14 @@ def Order(app):
   def orders_post():
     request = app.current_request
     data = request.json_body
-    request = app.current_request
-    data = request.json_body
-
     investor = Database.find_one("User", {"address": Web3.toChecksumAddress(data["investor"])})
     token = Database.find_one("Token", {"create_order_address": Web3.toChecksumAddress(data["createOrderAddress"])})
+    print(data)
+    print(date.fromtimestamp(int(data["executionDate"])))
     order_data = {
       "create_order_address": Web3.toChecksumAddress(data["createOrderAddress"]),
+      "execution_date": date.fromtimestamp(int(data["executionDate"])),
       "order_index": int(data["index"]), "investor_id": investor["id"],
-      "created_at": datetime.fromtimestamp(int(data["date"])),
       "token_id": token["id"], "state": 0
     }
     order = Database.find_one("Order", order_data)
@@ -107,7 +106,7 @@ def Order(app):
           order_broker["broker"] = Database.find_one("User", {"id": order_broker["broker_id"]}, ["address", "id","name"])
         order["order_brokers"] = order_brokers
 
-    orders = [to_object(u, ["id","create_order_address","order_index","investor_id","created_at","state", "token", "order_brokers", "investor"]) for u in orders]
+    orders = [to_object(u, ["id","create_order_address","order_index","investor_id","created_at","state","token","order_brokers","investor","execution_date"]) for u in orders]
     return orders
 
   @app.route("/orders/{order_id}", cors=True, methods=["GET"])
@@ -126,7 +125,7 @@ def Order(app):
     order_brokers = Database.find("OrderBroker", {"order_id": order["id"]})
     for ob in order_brokers: ob["broker"] = Database.find_one("User", {"id": ob["broker_id"]}, ["address", "id","name"])
     order["order_brokers"] = order_brokers
-    order = to_object(order, ["id","create_order_address","order_index","investor_id","created_at","state","token","order_brokers","investor"])
+    order = to_object(order, ["id","create_order_address","order_index","investor_id","created_at","state","token","order_brokers","investor","execution_date"])
     return order
 
   @app.route("/orders/{order_index}/set-price", cors=True, methods=["PUT"])

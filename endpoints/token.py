@@ -12,32 +12,36 @@ web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 def Token(app):
   @app.route('/tokens', cors=True, methods=['POST'])
   def tokens_post():
-    request = app.current_request
-    data = request.json_body
-    token_data = {
-      'name': data['name'],
-      'symbol': data['symbol'],
-      'decimals': data['decimals'],
-      'cutoff_time': datetime.fromtimestamp(int(data['cutoffTime']))
-    }
-    token = Database.find_one("Token", token_data)
-    token_data['address'] = data['tokenAddress']
-    if token:
-      Database.update("Token", {'id': token['id']}, token_data)
-    else:
-      Database.insert("Token", token_data)
-    token = Database.find_one("Token", token_data)
-    with open(contract_folder + 'TokenFactory.json') as file:
-      data = json.loads(file.read())
-      network = list(data['networks'].keys())[0]
-      token_factory_contract = web3.eth.contract(
-        address=Web3.toChecksumAddress(data['networks'][network]['address']),
-        abi=data['abi']
-      )
-      create_order_address = token_factory_contract.functions.tokenToCreateOrder(Web3.toChecksumAddress(token['address'])).call()
-      Database.update("Token", {'id': token['id']}, {'create_order_address': Web3.toChecksumAddress(create_order_address)})
-    token = to_object(token, ['id','name','symbol','address','create_order_address','decimals','cutoff_time'])
-    return token
+    try:
+      request = app.current_request
+      data = request.json_body
+      token_data = {
+        'name': data['name'],
+        'symbol': data['symbol'],
+        'decimals': data['decimals'],
+        'cutoff_time': int(data['cutoffTime'])
+      }
+      token = Database.find_one("Token", token_data)
+      token_data['address'] = data['tokenAddress']
+      if token:
+        Database.update("Token", {'id': token['id']}, token_data)
+      else:
+        Database.insert("Token", token_data)
+      token = Database.find_one("Token", token_data)
+      with open(contract_folder + 'TokenFactory.json') as file:
+        data = json.loads(file.read())
+        network = list(data['networks'].keys())[0]
+        token_factory_contract = web3.eth.contract(
+          address=Web3.toChecksumAddress(data['networks'][network]['address']),
+          abi=data['abi']
+        )
+        create_order_address = token_factory_contract.functions.tokenToCreateOrder(Web3.toChecksumAddress(token['address'])).call()
+        Database.update("Token", {'id': token['id']}, {'create_order_address': Web3.toChecksumAddress(create_order_address)})
+      token = to_object(token, ['id','name','symbol','address','create_order_address','decimals','cutoff_time'])
+      return token
+    except Exception as e:
+      print(e)
+      raise e
 
   @app.route('/tokens', cors=True, methods=['GET'])
   def tokens_get():

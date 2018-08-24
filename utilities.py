@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 import jwt
 
 def loggedin_middleware(app):
@@ -22,6 +22,8 @@ def to_object(model, keys):
     output[key] = model[key]
     if(type(output[key]) == datetime):
       output[key] = output[key].timestamp()
+    elif(type(output[key]) == date):
+      output[key] = output[key].isoformat()
   return output
 
 
