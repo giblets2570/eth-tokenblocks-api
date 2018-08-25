@@ -18,6 +18,15 @@ from passlib.hash import pbkdf2_sha256
 web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
 def seedData():
+  user = Database.find_one("User", {'name': 'admin'})
+  if not user:
+    password_hash = pbkdf2_sha256.hash('admin')
+    Database.insert("User", {
+      'name': 'admin',
+      'password': password_hash,
+      'address': web3.eth.accounts[0],
+      'role': 'admin'
+    })
   user = Database.find_one("User", {'name': 'broker1'})
   if not user:
     password_hash = pbkdf2_sha256.hash('broker1')

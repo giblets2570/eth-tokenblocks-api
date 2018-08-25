@@ -37,7 +37,7 @@ CREATE TABLE Token (
 CREATE TABLE TokenHolding (
     id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     ticker VARCHAR(50),
-    percent VARCHAR(50),
+    stock INT(6),
     token_id INT(6) UNSIGNED,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (token_id) REFERENCES Token(id)

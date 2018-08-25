@@ -9,6 +9,9 @@ contract_folder = os.environ.get('CONTRACT_FOLDER', None)
 assert contract_folder != None
 web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
+with open(contract_folder + "ETT.json") as file:
+  ett_contract_abi = json.loads(file.read())["abi"]
+
 def Token(app):
   @app.route('/tokens', cors=True, methods=['POST'])
   def tokens_post():
@@ -69,28 +72,44 @@ def Token(app):
 
 
   @app.route('/tokens/{token_id}/holdings', cors=True, methods=['POST'])
-  def token_get_holdings(token_id):
+  @loggedin_middleware(app, 'admin')
+  def token_post_holdings(token_id):
     request = app.current_request
     data = request.json_body
     token = Database.find_one('Token', {'id': int(token_id)})
     if not token: raise NotFoundError('token not found with id {}'.format(token_id))
+
+    # Generate the data for hashing
     holdings = data['holdings']
-    holdings_hash = {}
-    for h in holdings:
-      holdings_hash[h['ticker']] = h['percent']
-    tickers = list(holdings_hash.keys())
-    tickers.sort()
-    holdings_hash['tickers'] = tickers
-    return holdings_hash
+    holdings_dict = {}
+    for h in holdings: holdings_dict[h['ticker']] = h['stock']
 
-    # percent = data['percent']
-    # ticker = Web3.toBytes(hexstr=data['ticker']).decode("utf-8")
-    # token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
-    # if token_holding:
-    #   Database.update('TokenHolding', {'id': token_holding['id']}, {'percent': percent})
-    # else:
-    #   Database.insert('TokenHolding', {'percent': percent, 'ticker': ticker, 'token_id': token['id']})
-    # token_holding = Database.find_one('TokenHolding', {'ticker': ticker})
-    # return to_object(token_holding, ['id', 'ticker', 'percent', 'created_at'])
+    # need tickers to be sorted
+    tickers = sorted(list(holdings_dict.keys()))
 
+    holdings_dict_str = json.dumps([{'ticker': key, 'stock': holdings_dict[key]} for key in tickers], separators=(',', ':'))
+    holdings_hash = Web3.sha3(text=holdings_dict_str).hex()
 
+    signature = web3.eth.sign(web3.eth.accounts[0], hexstr=holdings_hash).hex()
+    r = signature[2:][0:64]
+    s = signature[2:][64:128]
+    v = int(signature[2:][128:130]) + 27
+
+    # Set the signature on the contract
+    ett_contract = web3.eth.contract(
+      address=Web3.toChecksumAddress(token["address"]),
+      abi=ett_contract_abi
+    )
+    transaction = ett_contract.functions.updateHoldings(v, r, s).transact({"from": web3.eth.accounts[0]})
+
+    # Save the holdings to the database
+    Database.remove('TokenHolding', {'token_id': token['id']})
+    for holding in holdings:
+      Database.insert('TokenHolding', {
+        'token_id': token['id'], 
+        'ticker': holding['ticker'],
+        'stock': holding['stock']
+      })
+
+    holdings = Database.find('TokenHolding', {'token_id': token['id']})
+    return holdings

@@ -19,8 +19,6 @@ def Order(app):
     data = request.json_body
     investor = Database.find_one("User", {"address": Web3.toChecksumAddress(data["investor"])})
     token = Database.find_one("Token", {"create_order_address": Web3.toChecksumAddress(data["createOrderAddress"])})
-    print(data)
-    print(date.fromtimestamp(int(data["executionDate"])))
     order_data = {
       "create_order_address": Web3.toChecksumAddress(data["createOrderAddress"]),
       "execution_date": date.fromtimestamp(int(data["executionDate"])),
