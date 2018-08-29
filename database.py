@@ -114,4 +114,5 @@ class Database(object):
         sql = "DELETE FROM `{}`".format(table_name)
         if wheres: sql += " WHERE {}".format(wheres)
         cursor.execute(sql, values)
+        connection.commit()
       connection.close()

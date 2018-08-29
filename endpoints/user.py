@@ -2,19 +2,12 @@ from database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3
-from utilities import loggedin_middleware
-
-def to_object(model, keys):
-  output = dict()
-  for key in keys:
-    output[key] = model[key]
-    if(type(output[key]) == datetime):
-      output[key] = output[key].timestamp()
-  return output
+from utilities import loggedin_middleware, to_object, print_error
 
 def User(app):
 
   @app.route('/users', cors=True, methods=['GET'])
+  @print_error
   # @loggedin_middleware
   def users_get():
     request = app.current_request
@@ -29,6 +22,7 @@ def User(app):
     return users
 
   @app.route('/users/{user_id}', cors=True, methods=['GET'])
+  @print_error
   def user_get(user_id):
     request = app.current_request
     user = Database.find_one("User", {'id': int(user_id)})
@@ -36,6 +30,7 @@ def User(app):
     return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature'])
 
   @app.route('/users/{user_id}', cors=True, methods=['PUT'])
+  @print_error
   def user_put(user_id):
     request = app.current_request
     data = request.json_body
@@ -45,29 +40,26 @@ def User(app):
     return {'message':'Done'}
 
   @app.route('/users/{address}/bundle', cors=True)
+  @print_error
   def accounts(address):
-    try:
-      user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
-      if not user: raise NotFoundError('user not found with address {}'.format(address))
-      return to_object(user, ['ik', 'spk', 'signature'])
-    except Exception as e:
-      print(e)
-      raise e
+    user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
+    if not user: raise NotFoundError('user not found with address {}'.format(address))
+    return to_object(user, ['ik', 'spk', 'signature'])
 
   @app.route('/accounts/{address}/check-kyc')
+  @print_error
   def checkKyc(address):
     user =  Database.find_one("User", {'address': address})
     if not user: raise NotFoundError('user not found with address {}'.format(address))
-
     user = refresh_user_token(user)
     accounts = Truelayer.get_accounts(user)
-
     if not(len(accounts)):
       raise ForbiddenError('Not KYC')
     else:
       return {'message': 'Is KYC', 'status': 200}
 
   @app.route('/accounts/{address}/check-balance')
+  @print_error
   def checkBalance(address):
     request = app.current_request
     amount = int(request.query_params['amount'])

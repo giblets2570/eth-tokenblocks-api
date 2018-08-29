@@ -1,22 +1,34 @@
 from datetime import datetime, date
 from chalice import ForbiddenError
-import jwt
+import jwt, os
+
+secret = os.getenv('SECRET', None)
+assert secret != None
 
 def loggedin_middleware(app, role=None):
   def outer(func):
     def inner(*args, **kwargs):
       headers = app.current_request.headers
-      authorization = headers['authorization'].replace('Bearer ', '')
       try:
-        result = jwt.decode(authorization, 'secret', algorithms=['HS256'])
+        authorization = headers['authorization'].replace('Bearer ', '')
+        user = jwt.decode(authorization, secret, algorithms=['HS256'])
         if role and user['role'] != role: raise ForbiddenError("You aren't authenticated")
-        setattr(app.current_request, 'user', result)
+        setattr(app.current_request, 'user', user)
         return func(*args, **kwargs)
       except Exception as e:
         print(e)
         raise e
     return inner
   return outer
+
+def print_error(func):
+  def inner(*args, **kwargs):
+    try:
+      return func(*args, **kwargs)
+    except Exception as e:
+      print(e)
+      raise e
+  return inner
 
 def to_object(model, keys):
   output = dict()

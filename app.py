@@ -5,10 +5,12 @@ from endpoints.auth import Auth
 from endpoints.user import User
 from endpoints.order import Order
 from endpoints.token import Token
+from endpoints.trade import Trade
 from endpoints.truelayer import Truelayer
 Auth(app)
 User(app)
 Token(app)
+Trade(app)
 Order(app)
 Truelayer(app)
 from database import Database
@@ -56,6 +58,7 @@ def seedData():
     })
 
 # Database.clean_table('TokenHolding')
+# Database.clean_table('TokenBalance')
 # Database.clean_table('Token')
 # Database.clean_table('OrderBroker')
 # Database.clean_table('`Order`')

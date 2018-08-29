@@ -1,14 +1,17 @@
 CREATE SCHEMA IF NOT EXISTS `ett` DEFAULT CHARACTER SET utf8 ;
 USE `ett`;
 
+DROP TABLE IF EXISTS TradeOrder;
+DROP TABLE IF EXISTS Trade;
 DROP TABLE IF EXISTS OrderBroker;
 DROP TABLE IF EXISTS `Order`;
 DROP TABLE IF EXISTS TokenHolding;
+DROP TABLE IF EXISTS TokenBalance;
 DROP TABLE IF EXISTS Token;
 DROP TABLE IF EXISTS User;
 
 CREATE TABLE User (
-    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     ik VARCHAR(300),
     spk VARCHAR(300),
     signature VARCHAR(300),
@@ -17,56 +20,88 @@ CREATE TABLE User (
     role VARCHAR(50),
     name VARCHAR(50),
     password VARCHAR(300),
-    truelayer_account_id VARCHAR(50),
-    truelayer_access_token VARCHAR(1500),
-    truelayer_refresh_token VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    truelayerAccountId VARCHAR(50),
+    truelayerAccessToken VARCHAR(1500),
+    truelayerRefreshToken VARCHAR(100),
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE Token (
-    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    create_order_address VARCHAR(50),
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    createOrderAddress VARCHAR(50),
     address VARCHAR(50),
-    cutoff_time INT(6),
+    cutoffTime INT,
     symbol VARCHAR(50),
     name VARCHAR(50),
-    decimals INT(6),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    decimals INT,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE TokenBalance (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    tokenId INT UNSIGNED,
+    investorId INT UNSIGNED,
+    balance BIGINT,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tokenId) REFERENCES Token(id),
+    FOREIGN KEY (investorId) REFERENCES User(id)
 );
 
 CREATE TABLE TokenHolding (
-    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     ticker VARCHAR(50),
-    stock INT(6),
-    token_id INT(6) UNSIGNED,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (token_id) REFERENCES Token(id)
+    stock INT,
+    tokenId INT UNSIGNED,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tokenId) REFERENCES Token(id)
 );
 
 CREATE TABLE `Order` (
-    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    create_order_address VARCHAR(50),
-    order_index INT(6) UNSIGNED,
-    investor_id INT(6) UNSIGNED,
-    token_id INT(6) UNSIGNED,
-    state INT(6) UNSIGNED,
-    broker_id INT(6) UNSIGNED,
-    execution_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (broker_id) REFERENCES User(id),
-    FOREIGN KEY (investor_id) REFERENCES User(id),
-    FOREIGN KEY (token_id) REFERENCES Token(id)
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    investorId INT UNSIGNED,
+    brokerId INT UNSIGNED,
+    tokenId INT UNSIGNED,
+    ik VARCHAR(200),
+    ek VARCHAR(200),
+    nominalAmount VARCHAR(100),
+    price VARCHAR(100),
+    executionDate INT UNSIGNED,
+    expirationTimestampInSec INT UNSIGNED,
+    salt INT UNSIGNED,
+    state INT UNSIGNED, -- 0 == initialize, 1 == created, 2 == confirmed, 3 == investor cancel, 4 == broker cancel
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tokenId) REFERENCES Token(id),
+    FOREIGN KEY (brokerId) REFERENCES User(id),
+    FOREIGN KEY (investorId) REFERENCES User(id)
 );
 
 CREATE TABLE OrderBroker (
-    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    broker_id INT(6) UNSIGNED,
-    order_id INT(6) UNSIGNED,
-    state INT(6) UNSIGNED,
-    amount VARCHAR(100),
-    price VARCHAR(100),
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    brokerId INT UNSIGNED,
     ik VARCHAR(200),
     ek VARCHAR(200),
-    FOREIGN KEY (order_id) REFERENCES `Order`(id),
-    FOREIGN KEY (broker_id) REFERENCES User(id)
+    nominalAmount VARCHAR(100),
+    price VARCHAR(100),
+    orderId INT UNSIGNED,
+    state INT, -- 0 == initialize, 1 == chosen, 2 == disguarded
+    FOREIGN KEY (brokerId) REFERENCES User(id),
+    FOREIGN KEY (orderId) REFERENCES `Order`(id)
 );
+
+CREATE TABLE Trade (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    brokerId INT UNSIGNED,
+    signature VARCHAR(300),
+    verified BOOLEAN,
+    FOREIGN KEY (brokerId) REFERENCES User(id)
+);
+
+CREATE TABLE TradeOrder (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    orderId INT UNSIGNED,
+    tradeId INT UNSIGNED,
+    FOREIGN KEY (orderId) REFERENCES `Order`(id),
+    FOREIGN KEY (tradeId) REFERENCES Trade(id)
+);
+
+
