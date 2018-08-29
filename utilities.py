@@ -33,6 +33,7 @@ def print_error(func):
 def to_object(model, keys):
   output = dict()
   for key in keys:
+    if key not in model: continue
     output[key] = model[key]
     if(type(output[key]) == datetime):
       output[key] = output[key].timestamp()

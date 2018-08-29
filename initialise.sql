@@ -69,6 +69,8 @@ CREATE TABLE `Order` (
     expirationTimestampInSec INT UNSIGNED,
     salt INT UNSIGNED,
     state INT UNSIGNED, -- 0 == initialize, 1 == created, 2 == confirmed, 3 == investor cancel, 4 == broker cancel
+    hash VARCHAR(200),
+    sk VARCHAR(200),
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tokenId) REFERENCES Token(id),
     FOREIGN KEY (brokerId) REFERENCES User(id),
