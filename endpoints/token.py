@@ -22,22 +22,14 @@ def Token(app):
       'name': data['name'],
       'symbol': data['symbol'],
       'decimals': data['decimals'],
-      'cutoffTime': int(data['cutoffTime'])
+      'cutoffTime': int(data['cutoffTime']),
+      'address': data['tokenAddress']
     }
-    token = Database.find_one("Token", token_data)
-    token_data['address'] = data['tokenAddress']
-    if token:
-      Database.update("Token", {'id': token['id']}, token_data)
-    else:
-      Database.insert("Token", token_data)
-      token = Database.find_one("Token", token_data)
+    token = Database.find_one("Token", token_data, insert=True)
     investors = Database.find("User", {"role": "investor"})
     for investor in investors:
-      balance = Database.find("TokenBalance", {"investorId": investor["id"], 'tokenId': token['id']})
-      if not balance: 
-        Database.insert("TokenBalance", {"investorId": investor["id"], "balance": 0, 'tokenId': token['id']})
-    token = Database.find_one("Token", token_data)
-    token = to_object(token, ['id','name','symbol','address','decimals','cutoffTime'])
+      balance = Database.find_one("TokenBalance", {"investorId": investor["id"], 'tokenId': token['id']}, insert=True)
+    token = to_object(token)
     return token
 
   @app.route('/tokens', cors=True, methods=['GET'])
@@ -45,7 +37,7 @@ def Token(app):
   def tokens_get():
     request = app.current_request
     tokens = Database.find("Token", {})
-    tokens = [to_object(u, ['id','name','symbol','address','decimals','cutoffTime']) for u in tokens]
+    tokens = [to_object(u) for u in tokens]
     return tokens
 
   @app.route('/tokens/{tokenId}', cors=True, methods=['GET'])
@@ -54,7 +46,7 @@ def Token(app):
     request = app.current_request
     token = Database.find_one('Token', {'id': int(tokenId)})
     if not token: raise NotFoundError('token not found with id {}'.format(tokenId))
-    token = to_object(token, ['id','name','symbol','address','decimals','cutoffTime'])
+    token = to_object(token)
     return token
 
   @app.route('/tokens/{tokenId}/balance', cors=True, methods=['GET'])
@@ -64,7 +56,7 @@ def Token(app):
     request = app.current_request
     tokenBalance = Database.find_one('TokenBalance', {'tokenId': int(tokenId), 'investorId': request.user['id']})
     if not tokenBalance: raise NotFoundError('tokenBalance not found with token id {}'.format(tokenId))
-    return to_object(tokenBalance, ['id','balance','tokenId'])
+    return to_object(tokenBalance)
 
   @app.route('/tokens/{tokenId}/holdings', cors=True, methods=['GET'])
   @print_error
@@ -72,9 +64,25 @@ def Token(app):
     request = app.current_request
     token = Database.find_one('Token', {'id': int(tokenId)})
     if not token: raise NotFoundError('token not found with id {}'.format(tokenId))
-    token_holdings = Database.find('TokenHolding', {'tokenId': token['id']})
-    token_holdings = [to_object(t, ['id', 'ticker', 'stock', 'created_at']) for t in token_holdings]
+    token_holdings = Database.find('TokenHoldings', {'tokenId': token['id']})
+    token_holdings = [to_object(t) for t in token_holdings]
     return token_holdings
+
+
+  @app.route('/tokens/{tokenId}/balances', cors=True, methods=['GET'])
+  @print_error
+  def token_get_balances(tokenId):
+    request = app.current_request
+    token = Database.find_one('Token', {'id': int(tokenId)})
+    if not token: raise NotFoundError('token not found with id {}'.format(tokenId))
+    token_balances = Database.find('TokenBalance', {'tokenId': token['id']})
+
+    for token_balance in token_balances:
+      investor = Database.find_one("User", {"id": token_balance["investorId"]}, ['id', 'name', 'address'])
+      token_balance["investor"] = investor
+
+    token_balances = [to_object(t) for t in token_balances]
+    return token_balances
 
 
   @app.route('/tokens/{tokenId}/holdings', cors=True, methods=['POST'])
@@ -119,5 +127,5 @@ def Token(app):
       })
 
     token_holdings = Database.find('TokenHolding', {'tokenId': token['id']})
-    token_holdings = [to_object(t, ['id', 'ticker', 'stock', 'created_at']) for t in token_holdings]
+    token_holdings = [to_object(t) for t in token_holdings]
     return token_holdings

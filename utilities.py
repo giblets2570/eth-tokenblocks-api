@@ -30,8 +30,9 @@ def print_error(func):
       raise e
   return inner
 
-def to_object(model, keys):
+def to_object(model, keys=None):
   output = dict()
+  if not keys: keys = list(model.keys())
   for key in keys:
     if key not in model: continue
     output[key] = model[key]

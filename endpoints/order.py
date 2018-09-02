@@ -29,9 +29,9 @@ def Order(app):
 
     if order:
       return to_object(order, [
-        "id""investorId","brokerId","tokenId",
-        "ik","ek","nominalAmount","price","executionDate",
-        "expirationTimestampInSec","salt","state"
+        "id","ik","ek","signature","investorId","brokerId","broker",
+        "createdAt","token","orderBrokers","investor","executionDate",
+        "expirationTimestampInSec","salt","state","hash"
       ])
     
     orderData['state'] = 0
@@ -50,9 +50,9 @@ def Order(app):
       Database.insert("OrderBroker", orderBrokerData)
       orderBroker = Database.find_one("OrderBroker", orderBrokerData)
     return to_object(order, [
-      "id","investorId","brokerId","tokenId",
-      "ik","ek","nominalAmount","price","executionDate",
-      "expirationTimestampInSec","salt","state"
+      "id","ik","ek","signature","investorId","brokerId","broker",
+      "createdAt","token","orderBrokers","investor","executionDate",
+      "expirationTimestampInSec","salt","state","hash"
     ])
 
   @app.route("/orders", cors=True, methods=["GET"])
@@ -91,7 +91,11 @@ def Order(app):
           orderBroker["broker"] = Database.find_one("User", {"id": orderBroker["brokerId"]}, ["address", "id","name"])
         order["orderBrokers"] = orderBrokers
 
-    orders = [to_object(u, ["id","investorId","createdAt","token","orderBrokers","investor","executionDate","expirationTimestampInSec","salt","state"]) for u in orders]
+    orders = [to_object(u, [
+      "id","ik","ek","signature","investorId","brokerId","broker",
+      "createdAt","token","orderBrokers","investor","executionDate",
+      "expirationTimestampInSec","salt","state","hash"
+    ]) for u in orders]
     return orders
 
   @app.route("/orders/{orderId}", cors=True, methods=["GET"])
@@ -99,7 +103,6 @@ def Order(app):
   @print_error
   def orders_show(orderId):
     request = app.current_request
-    data = request.json_body
     order = Database.find_one("Order", {"id": int(orderId)})
     if not order: raise NotFoundError("order not found with id {}".format(orderId))
     investor = Database.find_one("User", {"id": order["investorId"]}, ["address", "id","name"])
@@ -114,7 +117,11 @@ def Order(app):
     orderBrokers = Database.find("OrderBroker", {"orderId": order["id"]})
     for ob in orderBrokers: ob["broker"] = Database.find_one("User", {"id": ob["brokerId"]}, ["address", "id","name"])
     order["orderBrokers"] = orderBrokers
-    order = to_object(order, ["id","ik","ek","investorId","brokerId","broker","createdAt","token","orderBrokers","investor","executionDate","expirationTimestampInSec","salt","state","hash"])
+    order = to_object(order, [
+      "id","ik","ek","signature","investorId","brokerId","broker",
+      "createdAt","token","orderBrokers","investor","executionDate",
+      "expirationTimestampInSec","salt","state","hash"
+    ])
     return order
 
   @app.route("/orders/{orderId}", cors=True, methods=["PUT"])
@@ -125,9 +132,16 @@ def Order(app):
     data = request.json_body
     order = Database.find_one("Order", {"id": int(orderId)})
     if not order: raise NotFoundError("order not found with id {}".format(orderId))
+
     Database.update("Order", {"id": int(orderId)}, data)
     order = Database.find_one("Order", {"id": int(orderId)})
-    order = to_object(order, ["id","ik","ek","investorId","createdAt","investorId","executionDate","expirationTimestampInSec","salt","state"])
+    order = to_object(order, [
+      "id","ik","ek","signature","investorId","brokerId","broker",
+      "createdAt","token","orderBrokers","investor","executionDate",
+      "expirationTimestampInSec","salt","state","hash"
+    ])
+    # Socket
+    r = requests.post(socket_uri + "order-update", data={"id": order["id"]})
     return order
 
 
@@ -143,32 +157,13 @@ def Order(app):
     if not orderBroker: raise NotFoundError("orderBroker not found with order id {}".format(orderId))
     Database.update("OrderBroker", {"id": orderBroker["id"]}, {"price": data["price"]})
 
-    
-    order = to_object(order, ["id","ik","ek","investorId","createdAt","tokenId","investorId","executionDate","expirationTimestampInSec","salt","state"])
+    order = to_object(order, [
+      "id","ik","ek","signature","investorId","brokerId","broker",
+      "createdAt","token","orderBrokers","investor","executionDate",
+      "expirationTimestampInSec","salt","state","hash"
+    ])
     # Socket
     r = requests.post(socket_uri + "order-update", data={"id": order["id"]})
-    print(r.text)
-    return order
-
-
-  @app.route("/orders/{orderHash}/accepted", cors=True, methods=["PUT"])
-  @print_error
-  def orders_accepted(orderHash):
-    request = app.current_request
-    data = request.json_body
-
-    broker = Database.find_one("User", {"address": data["broker"]})
-    print(broker)
-    order = Database.find_one("Order", {"hash": orderHash})
-    if not order: raise NotFoundError("order not found with hash {}".format(orderHash))
-    
-    Database.update("Order", {"id": order["id"]}, {"state": 1})
-    Database.update("OrderBroker", {"orderId": order["id"], "brokerId": broker["id"]}, {"state": 1})
-
-    r = requests.post(socket_uri + "order-update", data={"id": order["id"]})
-
-    order["state"] = 1
-    order = to_object(order, ["id","ik","ek","investorId","createdAt","tokenId","investorId","executionDate","expirationTimestampInSec","salt","state"])
     return order
 
   @app.route("/orders/{orderHash}/confirmed", cors=True, methods=["PUT"])
@@ -178,14 +173,17 @@ def Order(app):
     data = request.json_body
 
     broker = Database.find_one("User", {"address": data["broker"]})
-    print(broker)
     order = Database.find_one("Order", {"hash": orderHash})
     if not order: raise NotFoundError("order not found with hash {}".format(orderHash))
     
-    Database.update("Order", {"id": order["id"]}, {"state": 2})
-    Database.update("OrderBroker", {"orderId": order["id"], "brokerId": broker["id"]}, {"state": 2})
+    Database.update("Order", {"id": order["id"]}, {"state": 1})
+    Database.update("OrderBroker", {"orderId": order["id"], "brokerId": broker["id"]}, {"state": 1})
 
     r = requests.post(socket_uri + "order-update", data={"id": order["id"]})
-    order["state"] = 2
-    order = to_object(order, ["id","ik","ek","investorId","createdAt","tokenId","investorId","executionDate","expirationTimestampInSec","salt","state"])
+    order["state"] = 1
+    order = to_object(order, [
+      "id","ik","ek","signature","investorId","brokerId","broker",
+      "createdAt","token","orderBrokers","investor","executionDate",
+      "expirationTimestampInSec","salt","state","hash"
+    ])
     return order

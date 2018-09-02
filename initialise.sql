@@ -1,12 +1,15 @@
-CREATE SCHEMA IF NOT EXISTS `ett` DEFAULT CHARACTER SET utf8 ;
+CREATE SCHEMA IF NOT EXISTS `ett` DEFAULT CHARACTER SET utf8;
 USE `ett`;
 
 DROP TABLE IF EXISTS TradeOrder;
+DROP TABLE IF EXISTS TradeHolding;
 DROP TABLE IF EXISTS Trade;
 DROP TABLE IF EXISTS OrderBroker;
 DROP TABLE IF EXISTS `Order`;
 DROP TABLE IF EXISTS TokenHolding;
+DROP TABLE IF EXISTS TokenHoldings;
 DROP TABLE IF EXISTS TokenBalance;
+DROP TABLE IF EXISTS Security;
 DROP TABLE IF EXISTS Token;
 DROP TABLE IF EXISTS User;
 
@@ -28,12 +31,18 @@ CREATE TABLE User (
 
 CREATE TABLE Token (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    createOrderAddress VARCHAR(50),
     address VARCHAR(50),
-    cutoffTime INT,
+    cutoffTime INT UNSIGNED,
     symbol VARCHAR(50),
     name VARCHAR(50),
-    decimals INT,
+    decimals SMALLINT UNSIGNED,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Security (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    symbol VARCHAR(50),
+    name VARCHAR(50),
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -41,19 +50,28 @@ CREATE TABLE TokenBalance (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     tokenId INT UNSIGNED,
     investorId INT UNSIGNED,
-    balance BIGINT,
+    balance BIGINT UNSIGNED DEFAULT 0,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tokenId) REFERENCES Token(id),
     FOREIGN KEY (investorId) REFERENCES User(id)
 );
 
-CREATE TABLE TokenHolding (
+CREATE TABLE TokenHoldings (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    ticker VARCHAR(50),
-    stock INT,
     tokenId INT UNSIGNED,
+    executionDate DATE,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tokenId) REFERENCES Token(id)
+);
+
+CREATE TABLE TokenHolding (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    securityId INT UNSIGNED,
+    securityAmount INT UNSIGNED,
+    tokenHoldingsId INT UNSIGNED,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tokenHoldingsId) REFERENCES TokenHoldings(id),
+    FOREIGN KEY (securityId) REFERENCES Security(id)
 );
 
 CREATE TABLE `Order` (
@@ -65,10 +83,11 @@ CREATE TABLE `Order` (
     ek VARCHAR(200),
     nominalAmount VARCHAR(100),
     price VARCHAR(100),
-    executionDate INT UNSIGNED,
-    expirationTimestampInSec INT UNSIGNED,
+    executionDate DATE,
+    expirationTimestampInSec BIGINT UNSIGNED,
     salt INT UNSIGNED,
-    state INT UNSIGNED, -- 0 == initialize, 1 == created, 2 == confirmed, 3 == investor cancel, 4 == broker cancel
+    state INT UNSIGNED, -- 0 == created, 1 == confirmed, 2 == verified, 2 == investor cancel, 3 == broker cancel
+    signature VARCHAR(300),
     hash VARCHAR(200),
     sk VARCHAR(200),
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -93,9 +112,22 @@ CREATE TABLE OrderBroker (
 CREATE TABLE Trade (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     brokerId INT UNSIGNED,
+    tokenId INT UNSIGNED,
     signature VARCHAR(300),
-    verified BOOLEAN,
-    FOREIGN KEY (brokerId) REFERENCES User(id)
+    verified BOOLEAN DEFAULT FALSE,
+    executionDate DATE,
+    FOREIGN KEY (brokerId) REFERENCES User(id),
+    FOREIGN KEY (tokenId) REFERENCES Token(id)
+);
+
+CREATE TABLE TradeHolding (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    securityId INT UNSIGNED,
+    tradeId INT UNSIGNED,
+    amount INT,
+    cost INT,
+    FOREIGN KEY (tradeId) REFERENCES Trade(id),
+    FOREIGN KEY (securityId) REFERENCES Security(id)
 );
 
 CREATE TABLE TradeOrder (

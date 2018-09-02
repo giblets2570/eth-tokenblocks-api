@@ -26,7 +26,7 @@ class Database(object):
       connection.close()
 
     @classmethod
-    def insert(cls, table_name, data):
+    def insert(cls, table_name, data, return_inserted = True):
       connection = create_connection()
       with connection.cursor() as cursor:
         keys = data.keys()
@@ -37,13 +37,12 @@ class Database(object):
 
         sql = "INSERT INTO `{}` ({}) VALUES ({})".format(table_name, insert_keys, insert_values)
         cursor.execute(sql, values)
-
-        result = cursor.fetchone()
         connection.commit()
       connection.close()
+      if return_inserted: return cls.find_one(table_name, data)
 
     @classmethod
-    def find_one(cls, table_name, query, return_filter = ['*']):
+    def find_one(cls, table_name, query, return_filter = ['*'], insert = False):
       result = None
       connection = create_connection()
       with connection.cursor() as cursor:
@@ -58,6 +57,7 @@ class Database(object):
         cursor.execute(sql, values)
 
         result = cursor.fetchone()
+        if result == None and insert: result = cls.insert(table_name, query)
       connection.close()
       return result
 
