@@ -31,6 +31,7 @@ def print_error(func):
   return inner
 
 def to_object(model, keys=None):
+  print(model)
   output = dict()
   if not keys: keys = list(model.keys())
   for key in keys:

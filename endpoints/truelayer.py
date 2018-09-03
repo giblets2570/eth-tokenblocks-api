@@ -9,15 +9,15 @@ assert contract_folder != None
 
 web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
-with open(contract_folder + 'Registry.json') as file:
+with open(contract_folder + 'Permissions.json') as file:
   data = json.loads(file.read())
   network = list(data['networks'].keys())[0]
-  registry_contract = web3.eth.contract(
+  permissions_contract = web3.eth.contract(
     address=Web3.toChecksumAddress(data['networks'][network]['address']),
     abi=data['abi']
   )
 
-  # wis = registry_contract.functions.isAdmin(web3.eth.accounts[0]).call({'from': web3.eth.accounts[0]})
+  # wis = permissions_contract.functions.isAdmin(web3.eth.accounts[0]).call({'from': web3.eth.accounts[0]})
 
 def refresh_user_token(user):
   Database.update(
@@ -66,7 +66,7 @@ def Truelayer(app):
     accounts = Truelayer.get_accounts(user)
     if not len(accounts): raise NotFoundError('No accounts found for user')
 
-    # update the registry contract
-    registry_contract.functions.registerInvestor(Web3.toChecksumAddress(user['address'])).transact({'from': web3.eth.accounts[0]})
+    # update the permissions contract
+    permissions_contract.functions.registerInvestor(Web3.toChecksumAddress(user['address'])).transact({'from': web3.eth.accounts[0]})
 
     return result

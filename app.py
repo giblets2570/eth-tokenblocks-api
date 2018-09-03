@@ -56,11 +56,24 @@ def seedData():
       'address': web3.eth.accounts[2],
       'role': 'investor'
     })
+  user = Database.find_one("User", {'name': 'custodian'})
+  if not user:
+    password_hash = pbkdf2_sha256.hash('custodian')
+    Database.insert("User", {
+      'name': 'custodian',
+      'password': password_hash,
+      'address': web3.eth.accounts[5],
+      'role': 'custodian'
+    })
 
+# Database.clean_table('OrderHolding')
+# Database.clean_table('OrderTrade')
+# Database.clean_table('`Order`')
+# Database.clean_table('TradeBroker')
+# Database.clean_table('Trade')
+# Database.clean_table('TokenHoldings')
 # Database.clean_table('TokenHolding')
 # Database.clean_table('TokenBalance')
 # Database.clean_table('Token')
-# Database.clean_table('OrderBroker')
-# Database.clean_table('`Order`')
 # Database.clean_table('User')
 seedData()
