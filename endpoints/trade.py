@@ -38,11 +38,8 @@ def Trade(app):
     tradeData['state'] = 0
     Database.insert("Trade", tradeData)
     trade = Database.find_one("Trade", tradeData)
-
     data['id'] = trade['id']
-
     r = requests.post(socket_uri + "trade-created", data=data)
-
     for brokerId, ik, ek, nominalAmount in zip(data['brokers'],data['iks'],data['eks'],data['nominalAmounts']):
       tradeBrokerData = {"tradeId": trade['id'],"brokerId": brokerId, "ik": ik, "ek": ek, "nominalAmount": nominalAmount}
       tradeBroker = Database.find_one("TradeBroker", tradeBrokerData)
@@ -64,9 +61,18 @@ def Trade(app):
     trades = []
     tradeBrokers = []
     query = request.query_params or {}
+    page = 0, page_count = None
+    
+    if 'page' in query:
+      page = query['page']
+      del query['page']
+    if 'page_count' in query:
+      page_count = query['page_count']
+      del query['page_count']
+
     if request.user["role"] == "investor":
       query["investorId"] = request.user["id"]
-      trades = Database.find("Trade", query)
+      trades = Database.find("Trade", query, page=page, page_count=page_count)
     elif request.user["role"] == "broker":
       tradeBrokers = Database.find("TradeBroker", {"brokerId": request.user["id"]})
       tradeIds = [tradeBroker["tradeId"] for tradeBroker in tradeBrokers]

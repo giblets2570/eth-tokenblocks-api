@@ -42,7 +42,6 @@ def Order(app):
     data = request.json_body
     executions = data['executions']
     trades = data['trades']
-    print(trades)
     order = {
       "brokerId": request.user["id"],
       "signature": data["signature"],

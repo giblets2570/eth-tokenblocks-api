@@ -31,10 +31,8 @@ class Database(object):
       with connection.cursor() as cursor:
         keys = data.keys()
         values = tuple([data[k] for k in keys])
-
         insert_keys = ', '.join(["`{}`".format(k) for k in keys])
         insert_values = ', '.join(["%s" for k in keys])
-
         sql = "INSERT INTO `{}` ({}) VALUES ({})".format(table_name, insert_keys, insert_values)
         cursor.execute(sql, values)
         connection.commit()
@@ -48,36 +46,29 @@ class Database(object):
       with connection.cursor() as cursor:
         keys = query.keys()
         values = tuple([query[k] for k in keys])
-
         return_filter_values = ', '.join(["`{}`".format(k) for k in return_filter])
-        
         wheres = " AND ".join((["`{}`=%s".format(k) for k in keys]))
-
         sql = "SELECT {} FROM `{}` WHERE {}".format(return_filter_values, table_name, wheres)
         cursor.execute(sql, values)
-
         result = cursor.fetchone()
         if result == None and insert: result = cls.insert(table_name, query)
       connection.close()
       return result
 
     @classmethod
-    def find(cls, table_name, query, return_filter = ['*']):
+    def find(cls, table_name, query, return_filter = ['*'], page=0, page_count=None):
       result = None
       connection = create_connection()
       with connection.cursor() as cursor:
         keys = query.keys()
         values = tuple([query[k] for k in keys])
-
         return_filter_values = ', '.join(["`{}`".format(k) for k in return_filter])
-        
         wheres = " AND ".join((["`{}`=%s".format(k) for k in keys]))
-
-
         sql = "SELECT {} FROM `{}`".format(return_filter_values, table_name)
         if wheres: sql += " WHERE {}".format(wheres)
+        if page_count:
+          sql += " LIMIT {},{}".format(page_count*page,page_count*(page+1))
         cursor.execute(sql, values)
-
         result = cursor.fetchall()
       connection.close()
       return result
@@ -89,16 +80,12 @@ class Database(object):
         query_keys = query.keys()
         query_values = tuple([query[k] for k in query_keys])
         wheres = " AND ".join((["`{}`=%s".format(k) for k in query_keys]))
-
         data_keys = data.keys()
         data_values = tuple([data[k] for k in data_keys])
-
         setter = ', '.join(["{}=%s".format(k) for k in data_keys])
-
         sql = "UPDATE `{}` SET {}".format(table_name, setter)
         if wheres: sql += " WHERE {}".format(wheres)
         cursor.execute(sql, data_values + query_values)
-        
         connection.commit()
       connection.close()
 
@@ -108,9 +95,7 @@ class Database(object):
       with connection.cursor() as cursor:
         keys = query.keys()
         values = tuple([query[k] for k in keys])
-        
         wheres = " AND ".join((["`{}`=%s".format(k) for k in keys]))
-
         sql = "DELETE FROM `{}`".format(table_name)
         if wheres: sql += " WHERE {}".format(wheres)
         cursor.execute(sql, values)
