@@ -80,6 +80,8 @@ class Database(object):
 
   @classmethod
   def find(cls, table_name, query=[], return_filter = ['*'], page=0, page_count=None):
+    if(page): page = int(page)
+    if(page_count): page_count = int(page_count)
     if(type(query) == dict): query = cls.data_to_query(query)
     if(type(query) == tuple): query = [query]
     if(len(query) and type(query[0]) == tuple): query = [query]
@@ -99,7 +101,8 @@ class Database(object):
       sql = "SELECT {} FROM `{}`".format(return_filter_values, table_name)
       if wheres: sql += " WHERE {}".format(wheres)
       if page_count:
-        sql += " LIMIT {},{}".format(page_count*page,page_count*(page+1))
+        sql += " LIMIT {} OFFSET {}".format(page_count,page_count*page)
+      print(sql)
       cursor.execute(sql, values)
       result = cursor.fetchall()
     connection.close()
