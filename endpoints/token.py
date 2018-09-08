@@ -36,7 +36,7 @@ def Token(app):
   @print_error
   def tokens_get():
     request = app.current_request
-    tokens = Database.find("Token", {})
+    tokens = Database.find("Token")
     tokens = [to_object(u) for u in tokens]
     return tokens
 

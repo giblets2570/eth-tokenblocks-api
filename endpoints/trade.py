@@ -61,7 +61,8 @@ def Trade(app):
     trades = []
     tradeBrokers = []
     query = request.query_params or {}
-    page = 0, page_count = None
+    page = 0
+    page_count = None
     
     if 'page' in query:
       page = query['page']
