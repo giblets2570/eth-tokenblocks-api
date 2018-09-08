@@ -1,4 +1,4 @@
-from database import Database
+from chalicelib.database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3

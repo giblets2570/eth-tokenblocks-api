@@ -1,5 +1,5 @@
-from truelayer import Truelayer
-from database import Database
+from chalicelib.truelayer import Truelayer
+from chalicelib.database import Database
 from chalice import Response, NotFoundError
 from web3 import Web3
 import os, json

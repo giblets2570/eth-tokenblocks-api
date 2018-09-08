@@ -1,4 +1,4 @@
-from database import Database
+from chalicelib.database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3
@@ -21,29 +21,29 @@ def User(app):
     users = [to_object(u, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature']) for u in users]
     return users
 
-  @app.route('/users/{user_id}', cors=True, methods=['GET'])
+  @app.route('/users/{userId}', cors=True, methods=['GET'])
   @print_error
-  def user_get(user_id):
+  def user_get(userId):
     request = app.current_request
-    user = Database.find_one("User", {'id': int(user_id)})
-    if not user: raise NotFoundError('user not found with id {}'.format(user_id))
+    user = Database.find_one("User", {'id': int(userId)})
+    if not user: raise NotFoundError('user not found with id {}'.format(userId))
     return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature'])
 
-  @app.route('/users/{user_id}', cors=True, methods=['PUT'])
+  @app.route('/users/{userId}', cors=True, methods=['PUT'])
   @print_error
-  def user_put(user_id):
+  def user_put(userId):
     request = app.current_request
     data = request.json_body
-    user = Database.find_one("User", {'id': int(user_id)})
-    if not user: raise NotFoundError('user not found with id {}'.format(user_id))
+    user = Database.find_one("User", {'id': int(userId)})
+    if not user: raise NotFoundError('user not found with id {}'.format(userId))
     Database.update('User', {'id': user['id']}, data)
     return {'message':'Done'}
 
-  @app.route('/users/{address}/bundle', cors=True)
+  @app.route('/users/{userId}/bundle', cors=True)
   @print_error
-  def accounts(address):
-    user =  Database.find_one("User", {'address': Web3.toChecksumAddress(address)})
-    if not user: raise NotFoundError('user not found with address {}'.format(address))
+  def accounts(userId):
+    user =  Database.find_one("User", {'id': int(userId)})
+    if not user: raise NotFoundError('user not found with id {}'.format(userId))
     return to_object(user, ['ik', 'spk', 'signature'])
 
   @app.route('/accounts/{address}/check-kyc')

@@ -1,4 +1,4 @@
-from database import Database
+from chalicelib.database import Database
 from datetime import datetime, date
 from chalice import NotFoundError, ForbiddenError
 from web3 import Web3
@@ -174,12 +174,12 @@ def Trade(app):
     r = requests.post(socket_uri + "trade-update", data={"id": trade["id"]})
     return trade
 
-  @app.route("/trades/{tradeHash}/confirmed", cors=True, methods=["PUT"])
+  @app.route("/trades/confirmed", cors=True, methods=["PUT"])
   @print_error
-  def trades_confirmed(tradeHash):
+  def trades_confirmed():
     request = app.current_request
     data = request.json_body
-
+    tradeHash = data['tradeHash']
     broker = Database.find_one("User", {"address": data["broker"]})
     trade = Database.find_one("Trade", {"hash": tradeHash})
     if not trade: raise NotFoundError("trade not found with hash {}".format(tradeHash))
@@ -195,3 +195,5 @@ def Trade(app):
       "expirationTimestampInSec","salt","state","hash"
     ])
     return trade
+
+

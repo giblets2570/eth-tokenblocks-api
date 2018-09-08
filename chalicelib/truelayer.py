@@ -31,7 +31,6 @@ class Truelayer(object):
       "client_secret": truelayer_client_secret, # Required The client secret you received after registering your application.
       "redirect_uri": 'http://localhost:8000/truelayer-callback', #  Required Your application’s redirect URI
     }
-    
     r = json.loads(requests.post("https://auth.truelayer.com/connect/token", data=data).text)
     return {
       "truelayer_access_token": r["access_token"],
@@ -45,7 +44,6 @@ class Truelayer(object):
     accounts = json.loads(r.text)['results']
     return accounts
 
-
   @classmethod
   def get_balance(cls, user):
     headers = {'Authorization': 'Bearer {}'.format(user['truelayer_access_token'])}
@@ -56,7 +54,6 @@ class Truelayer(object):
   
   @classmethod
   def get_auth_url(cls, nonce):
-
     redirect_uri = "http://localhost:8000/truelayer-callback"
     scope = "info%20accounts%20balance%20transactions%20offline_access"
     auth_url = "https://auth.truelayer.com/?response_type=code&client_id={}&redirect_uri={}&scope={}&nonce=foobar&state={}&enable_mock=true".format(truelayer_client_id,redirect_uri,scope,nonce)

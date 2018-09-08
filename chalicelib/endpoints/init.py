@@ -11,4 +11,4 @@ def createEndpoints(app):
 	Token(app)
 	Trade(app)
 	Order(app)
-	Truelayer(app)
+	# Truelayer(app)

@@ -1,6 +1,6 @@
 from passlib.hash import pbkdf2_sha256
-from truelayer import Truelayer
-from database import Database
+from chalicelib.truelayer import Truelayer
+from chalicelib.database import Database
 from datetime import datetime
 from chalice import Response, NotFoundError
 from web3 import Web3
