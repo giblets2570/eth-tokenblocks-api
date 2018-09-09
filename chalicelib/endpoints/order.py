@@ -17,9 +17,11 @@ def Order(app):
     if 'single' in query:
       del query['single']
       single = True
+      print(query)
       orders = [Database.find_one("Order", query)]
     else:
       orders = Database.find("Order", query)
+    print(orders)
     for order in orders:
       order["token"] = to_object(Database.find_one("Token", {"id": order["tokenId"]}))
       order["orderHoldings"] = Database.find("OrderHolding", {"orderId": order["id"]})

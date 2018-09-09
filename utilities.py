@@ -14,10 +14,10 @@ def loggedin_middleware(app, role=None):
         user = jwt.decode(authorization, secret, algorithms=['HS256'])
         if role and user['role'] != role: raise ForbiddenError("You aren't authenticated")
         setattr(app.current_request, 'user', user)
-        return func(*args, **kwargs)
       except Exception as e:
         print(e)
         raise e
+      return func(*args, **kwargs)
     return inner
   return outer
 
@@ -31,6 +31,8 @@ def print_error(func):
   return inner
 
 def to_object(model, keys=None):
+  if type(model) == list:
+    return [to_object(m, keys) for m in model]
   output = dict()
   if not keys: keys = list(model.keys())
   for key in keys:

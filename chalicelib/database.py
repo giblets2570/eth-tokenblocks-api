@@ -18,8 +18,10 @@ class Database(object):
   @classmethod
   def query_to_data(cls, query):
     data = {}
-    for line in query:
+    print(query)
+    for line in query[0]:
       data[line[0]] = line[2]
+    print(query, data)
     return data
 
   @classmethod
@@ -41,6 +43,8 @@ class Database(object):
 
   @classmethod
   def insert(cls, table_name, data, return_inserted = True):
+    if(type(data) == tuple): data = [data]
+    if(type(data) == list): data = data_to_query(data)
     connection = create_connection()
     with connection.cursor() as cursor:
       keys = data.keys()
