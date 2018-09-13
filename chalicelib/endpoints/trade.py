@@ -1,15 +1,19 @@
 from chalicelib.database import Database
 from datetime import datetime, date
 from chalice import NotFoundError, ForbiddenError
-from web3 import Web3
 import jwt, os, json, requests
-from utilities import loggedin_middleware, to_object, print_error
+from chalicelib.utilities import loggedin_middleware, to_object, print_error
 
-contract_folder = os.environ.get("CONTRACT_FOLDER", None)
-assert contract_folder != None
 socket_uri = os.environ.get("SOCKET_URI", None)
 assert socket_uri != None
-web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
+
+def passWithoutError(func):
+  def inner(*args, **kwargs):
+    try:
+      func(*args,**kwargs)
+    except Exception as e:
+      pass
+  return inner
 
 def Trade(app):
   @app.route("/trades", cors=True, methods=["POST"])
@@ -39,7 +43,7 @@ def Trade(app):
     Database.insert("Trade", tradeData)
     trade = Database.find_one("Trade", tradeData)
     data['id'] = trade['id']
-    r = requests.post(socket_uri + "trade-created", data=data)
+
     for brokerId, ik, ek, nominalAmount in zip(data['brokers'],data['iks'],data['eks'],data['nominalAmounts']):
       tradeBrokerData = {"tradeId": trade['id'],"brokerId": brokerId, "ik": ik, "ek": ek, "nominalAmount": nominalAmount}
       tradeBroker = Database.find_one("TradeBroker", tradeBrokerData)
@@ -47,6 +51,9 @@ def Trade(app):
       tradeBrokerData['state'] = 0
       Database.insert("TradeBroker", tradeBrokerData)
       tradeBroker = Database.find_one("TradeBroker", tradeBrokerData)
+
+    # Socket
+    r = passWithoutError(requests.post)(socket_uri + "trade-created", data=data)
     return to_object(trade, [
       "id","ik","ek","signature","investorId","brokerId","broker",
       "createdAt","token","tradeBrokers","investor","executionDate",
@@ -75,7 +82,7 @@ def Trade(app):
       query["investorId"] = request.user["id"]
       trades = Database.find("Trade", query, page=page, page_count=page_count)
     elif request.user["role"] == "broker":
-      tradeBrokers = Database.find("TradeBroker", {"brokerId": request.user["id"]})
+      tradeBrokers = Database.find("TradeBroker", {"brokerId": request.user["id"]}, page=page, page_count=page_count)
       tradeIds = [tradeBroker["tradeId"] for tradeBroker in tradeBrokers]
       for i, tradeId in enumerate(tradeIds):
         query["id"] = tradeId
@@ -149,7 +156,7 @@ def Trade(app):
       "expirationTimestampInSec","salt","state","hash"
     ])
     # Socket
-    r = requests.post(socket_uri + "trade-update", data={"id": trade["id"]})
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     return trade
 
 
@@ -171,7 +178,7 @@ def Trade(app):
       "expirationTimestampInSec","salt","state","hash"
     ])
     # Socket
-    r = requests.post(socket_uri + "trade-update", data={"id": trade["id"]})
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     return trade
 
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])
@@ -187,7 +194,8 @@ def Trade(app):
     Database.update("Trade", {"id": trade["id"]}, {"state": 1})
     Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": 1})
 
-    r = requests.post(socket_uri + "trade-update", data={"id": trade["id"]})
+    # Socket
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = 1
     trade = to_object(trade, [
       "id","ik","ek","signature","investorId","brokerId","broker",

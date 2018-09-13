@@ -1,29 +1,25 @@
-from chalicelib.truelayer import Truelayer
+from chalicelib.truelayer import Truelayer as TL
 from chalicelib.database import Database
+from chalicelib.web3helper import Web3Helper
 from chalice import Response, NotFoundError
-from web3 import Web3
-import os, json
+import os, json, random
 
-contract_folder = os.environ.get('CONTRACT_FOLDER', None)
-assert contract_folder != None
+front_end_url = os.environ.get('FRONT_END','http://localhost:3001/#/')
 
-web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
-
-with open(contract_folder + 'Permissions.json') as file:
-  data = json.loads(file.read())
-  network = list(data['networks'].keys())[0]
-  permissions_contract = web3.eth.contract(
-    address=Web3.toChecksumAddress(data['networks'][network]['address']),
-    abi=data['abi']
-  )
-
-  # wis = permissions_contract.functions.isAdmin(web3.eth.accounts[0]).call({'from': web3.eth.accounts[0]})
+permissions = Web3Helper.getContract("Permissions.json")
+permissions_contract_abi = permissions["abi"]
+network = list(permissions["networks"].keys())[0]
+permissions_contract_address = permissions["networks"][network]["address"]
+permissions_contract = permissions_contract = Web3Helper.contract(
+  address=Web3Helper.toChecksumAddress(permissions_contract_address),
+  abi=permissions_contract_abi
+)
 
 def refresh_user_token(user):
   Database.update(
     'User', 
     {"id": user["id"]},
-    Truelayer.get_refresh_token(user)
+    TL.get_refresh_token(user)
   )
   return Database.find_one("User", {'id': user["id"]})
 
@@ -31,12 +27,9 @@ def Truelayer(app):
   @app.route('/truelayer')
   def truelayer():
     request = app.current_request
-    if 'address' not in request.query_params: raise NotFoundError('address')
-    user_address = Web3.toChecksumAddress(request.query_params['address'])
-    user = Database.find_one('User', {'address': user_address})
-    if not user: 
-      Database.insert('User', {"address": user_address})
-      user = Database.find_one('User', {'address': user_address})
+    if 'id' not in request.query_params: raise NotFoundError('id')
+    user_id = request.query_params['id']
+    user = Database.find_one('User', {'id': user_id})
     nonce = ''.join(random.choice("qwertyuioplkjhgfdsazxvbnm") for _ in range(10))
     Database.update(
       'User',
@@ -47,9 +40,10 @@ def Truelayer(app):
       body=None,
       status_code=302,
       headers={
-        "Location" : Truelayer.get_auth_url(nonce)
+        "Location" : TL.get_auth_url(nonce)
       }
     )
+
   @app.route('/truelayer-callback')
   def truelayer_callback():
     request = app.current_request
@@ -57,16 +51,22 @@ def Truelayer(app):
     nonce = request.query_params['state']
     user =  Database.find_one("User", {'nonce': nonce})
     if not user: raise NotFoundError('user not found with id {}'.format(user_id))
-    Database.update(
+    user = Database.update(
       'User',
       {"id": user["id"]},
-      Truelayer.get_access_token(user, code)
+      TL.get_access_token(user, code),
+      return_updated = True
     )
-    user =  Database.find_one("User", {"id": user["id"]})
-    accounts = Truelayer.get_accounts(user)
+    accounts = TL.get_accounts(user)
     if not len(accounts): raise NotFoundError('No accounts found for user')
 
     # update the permissions contract
-    permissions_contract.functions.registerInvestor(Web3.toChecksumAddress(user['address'])).transact({'from': web3.eth.accounts[0]})
+    # Web3Helper.transact(permissions_contract,'setAuthorized',Web3Helper.toChecksumAddress(user['address']),1)
 
-    return result
+    return Response(
+      body=None,
+      status_code=302,
+      headers={
+        "Location" : "{}dashboard/profile/setup".format(front_end_url)
+      }
+    )

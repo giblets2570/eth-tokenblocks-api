@@ -3,6 +3,7 @@ from .user import User
 from .order import Order
 from .token import Token
 from .trade import Trade
+from .security import Security
 from .truelayer import Truelayer
 
 def createEndpoints(app):
@@ -11,4 +12,5 @@ def createEndpoints(app):
 	Token(app)
 	Trade(app)
 	Order(app)
-	# Truelayer(app)
+	Security(app)
+	Truelayer(app)

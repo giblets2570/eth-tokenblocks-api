@@ -1,5 +1,7 @@
 import pymysql.cursors, os
 
+port = os.environ.get('MYSQL_PORT', None)
+if port: port = int(port)
 # Connect to the database
 def create_connection():
   connection = pymysql.connect(
@@ -7,7 +9,7 @@ def create_connection():
     db = os.environ.get('MYSQL_DB', None),
     user = os.environ.get('MYSQL_USER', None),
     password = os.environ.get('MYSQL_PASSWORD', None),
-    port= os.environ.get('MYSQL_PORT', None),
+    port = port,
     charset = 'utf8mb4', 
     cursorclass = pymysql.cursors.DictCursor
   )
@@ -18,17 +20,12 @@ class Database(object):
   @classmethod
   def query_to_data(cls, query):
     data = {}
-    print(query)
-    for line in query[0]:
-      data[line[0]] = line[2]
-    print(query, data)
+    for line in query[0]: data[line[0]] = line[2]
     return data
 
   @classmethod
   def data_to_query(cls, data):
-    query = []
-    for key in data.keys():
-      query.append((key,'=',data[key]))
+    query = [(key,'=',data[key]) for key in data.keys()]
     return query
 
   @classmethod
@@ -57,8 +54,10 @@ class Database(object):
     connection.close()
     if return_inserted: return cls.find_one(table_name, data)
 
+
+
   @classmethod
-  def find_one(cls, table_name, query=[], return_filter = ['*'], insert = False):
+  def find_one(cls, table_name, query=[], return_filter = ['*'], insert = False, order_by=None):
     if(type(query) == dict): query = cls.data_to_query(query)
     if(type(query) == tuple): query = [query]
     if(len(query) and type(query[0]) == tuple): query = [query]
@@ -76,10 +75,11 @@ class Database(object):
       wheres = " OR ".join(wheres)
       values = tuple(values)
       sql = "SELECT {} FROM `{}` WHERE {}".format(return_filter_values, table_name, wheres)
+      if order_by: sql += " ORDER BY {}".format(order_by)
       cursor.execute(sql, values)
       result = cursor.fetchone()
-      if result == None and insert: result = cls.insert(table_name, cls.query_to_data(query))
     connection.close()
+    if result == None and insert: result = cls.insert(table_name, cls.query_to_data(query))
     return result
 
   @classmethod
@@ -106,17 +106,18 @@ class Database(object):
       if wheres: sql += " WHERE {}".format(wheres)
       if page_count:
         sql += " LIMIT {} OFFSET {}".format(page_count,page_count*page)
-      print(sql)
       cursor.execute(sql, values)
       result = cursor.fetchall()
     connection.close()
     return result
 
   @classmethod
-  def update(cls, table_name, query, data):
+  def update(cls, table_name, query, data, return_updated = False):
     connection = create_connection()
+    result = None
     with connection.cursor() as cursor:
       query_keys = query.keys()
+      print(data)
       query_values = tuple([query[k] for k in query_keys])
       wheres = " AND ".join((["`{}`=%s".format(k) for k in query_keys]))
       data_keys = data.keys()
@@ -124,9 +125,13 @@ class Database(object):
       setter = ', '.join(["{}=%s".format(k) for k in data_keys])
       sql = "UPDATE `{}` SET {}".format(table_name, setter)
       if wheres: sql += " WHERE {}".format(wheres)
+      print(sql, data_values + query_values)
       cursor.execute(sql, data_values + query_values)
       connection.commit()
     connection.close()
+    if result == None and return_updated: result = cls.find_one(table_name, query)
+    return result
+
 
   @classmethod
   def remove(cls, table_name, query):

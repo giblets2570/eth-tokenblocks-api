@@ -1,14 +1,15 @@
 CREATE SCHEMA IF NOT EXISTS `ett` DEFAULT CHARACTER SET utf8;
 USE `ett`;
 
+DROP TABLE IF EXISTS OrderTrade;
 DROP TABLE IF EXISTS TradeBroker;
 DROP TABLE IF EXISTS Trade;
-DROP TABLE IF EXISTS OrderTrade;
 DROP TABLE IF EXISTS OrderHolding;
 DROP TABLE IF EXISTS `Order`;
 DROP TABLE IF EXISTS TokenHolding;
 DROP TABLE IF EXISTS TokenHoldings;
 DROP TABLE IF EXISTS TokenBalance;
+DROP TABLE IF EXISTS SecurityTimestamp;
 DROP TABLE IF EXISTS Security;
 DROP TABLE IF EXISTS Token;
 DROP TABLE IF EXISTS User;
@@ -23,6 +24,7 @@ CREATE TABLE User (
     role VARCHAR(50),
     name VARCHAR(50),
     password VARCHAR(300),
+    email VARCHAR(300),
     truelayerAccountId VARCHAR(50),
     truelayerAccessToken VARCHAR(1500),
     truelayerRefreshToken VARCHAR(100),
@@ -46,6 +48,7 @@ CREATE TABLE Security (
     currency VARCHAR(50),
     country VARCHAR(50),
     sector VARCHAR(50),
+    class VARCHAR(50),
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -85,8 +88,6 @@ CREATE TABLE TokenHolding (
     FOREIGN KEY (tokenHoldingsId) REFERENCES TokenHoldings(id),
     FOREIGN KEY (securityId) REFERENCES Security(id)
 );
-
--- ----------------------------------------------------------------------------------------------------------
 
 CREATE TABLE Trade (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

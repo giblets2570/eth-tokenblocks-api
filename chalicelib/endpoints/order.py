@@ -1,13 +1,12 @@
 from chalicelib.database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
-from web3 import Web3
-from utilities import loggedin_middleware, to_object, print_error
+from chalicelib.utilities import loggedin_middleware, to_object, print_error
 
 def Order(app):
 
   @app.route('/orders', cors=True, methods=['GET'])
-  # @loggedin_middleware
+  @loggedin_middleware(app)
   @print_error
   def orders_get():
     request = app.current_request
@@ -21,8 +20,9 @@ def Order(app):
       orders = [Database.find_one("Order", query)]
     else:
       orders = Database.find("Order", query)
-    print(orders)
+
     for order in orders:
+      order["broker"] = Database.find_one("User", {"id": order["brokerId"]}, ['id','name','email','address'])
       order["token"] = to_object(Database.find_one("Token", {"id": order["tokenId"]}))
       order["orderHoldings"] = Database.find("OrderHolding", {"orderId": order["id"]})
 
@@ -42,7 +42,7 @@ def Order(app):
   def orders_post():
     request = app.current_request
     data = request.json_body
-    executions = data['executions']
+    print(data)
     trades = data['trades']
     order = {
       "brokerId": request.user["id"],
@@ -53,19 +53,20 @@ def Order(app):
     }
 
     order = Database.insert("Order", order)
-    for execution in executions:
-      security = Database.find_one("Security", {"symbol": execution["symbol"]}, insert=True)
-      amount = 1 if execution["direction"] == "Buy" else -1
-      amount *= int(execution["amount"])
+    for orderHolding in data['orderHoldings']:
+      security = Database.find_one("Security", {"id": orderHolding["securityId"]}, insert=True)
+      amount = 1 if orderHolding["direction"] == "Buy" else -1
+      amount *= int(orderHolding["amount"])
       orderHolding = {
         "securityId": security["id"],
         "orderId": order["id"],
         "amount": amount,
-        "cost": int(execution["cost"])
+        "cost": int(orderHolding["cost"]) if "cost" in orderHolding else 0
       }
       orderHolding = Database.insert("OrderHolding", orderHolding)
 
     for trade in trades:
+      Database.update("Trade", {"id": trade["id"]},{"sk": trade["sk"]})
       orderTrade = {
         "orderId": order["id"],
         "tradeId": trade["id"]

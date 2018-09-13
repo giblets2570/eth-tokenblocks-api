@@ -1,8 +1,8 @@
 from chalicelib.database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
-from web3 import Web3
-from utilities import loggedin_middleware, to_object, print_error
+from chalicelib.utilities import loggedin_middleware, to_object, print_error
+from chalicelib.web3helper import Web3Helper
 
 def User(app):
 
@@ -27,17 +27,20 @@ def User(app):
     request = app.current_request
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))
-    return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature'])
+    return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId'])
 
   @app.route('/users/{userId}', cors=True, methods=['PUT'])
   @print_error
   def user_put(userId):
     request = app.current_request
     data = request.json_body
+    if 'address' in data:
+      data['address'] = Web3Helper.toChecksumAddress(data['address'])
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))
-    Database.update('User', {'id': user['id']}, data)
-    return {'message':'Done'}
+    user = Database.update('User', {'id': user['id']}, data, return_updated=True)
+    print(user)
+    return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature'])
 
   @app.route('/users/{userId}/bundle', cors=True)
   @print_error

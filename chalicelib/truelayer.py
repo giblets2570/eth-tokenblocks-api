@@ -14,12 +14,12 @@ class Truelayer(object):
       "grant_type": 'refresh_token',
       "client_id": truelayer_client_id,
       "client_secret": truelayer_client_secret,
-      "refresh_token": user['truelayer_refresh_token'],
+      "refresh_token": user['truelayerRefreshToken'],
     }
     r = json.loads(requests.post("https://auth.truelayer.com/connect/token", data=data).text)
     return {
-      "truelayer_access_token": r["access_token"],
-      "truelayer_refresh_token": r["refresh_token"]
+      "truelayerAccessToken": r["access_token"],
+      "truelayerRefreshToken": r["refresh_token"]
     }
     
   @classmethod
@@ -33,21 +33,21 @@ class Truelayer(object):
     }
     r = json.loads(requests.post("https://auth.truelayer.com/connect/token", data=data).text)
     return {
-      "truelayer_access_token": r["access_token"],
-      "truelayer_refresh_token": r["refresh_token"]
+      "truelayerAccessToken": r["access_token"],
+      "truelayerRefreshToken": r["refresh_token"]
     }
 
   @classmethod
   def get_accounts(cls, user):
-    headers = {'Authorization': 'Bearer {}'.format(user['truelayer_access_token'])}
+    headers = {'Authorization': 'Bearer {}'.format(user['truelayerAccessToken'])}
     r = requests.get("https://api.truelayer.com/data/v1/accounts", headers=headers)
     accounts = json.loads(r.text)['results']
     return accounts
 
   @classmethod
   def get_balance(cls, user):
-    headers = {'Authorization': 'Bearer {}'.format(user['truelayer_access_token'])}
-    url = "https://api.truelayer.com/data/v1/accounts/{}/balance".format(user['truelayer_account_id'])
+    headers = {'Authorization': 'Bearer {}'.format(user['truelayerAccessToken'])}
+    url = "https://api.truelayer.com/data/v1/accounts/{}/balance".format(user['truelayerAccountId'])
     r = requests.get(url, headers=headers)
     result = json.loads(r.text)['results'][0]
     return result
@@ -64,8 +64,8 @@ class Truelayer(object):
   def get_transactions(cls, user):
     now = arrow.now()
     previous = now.shift(months=-1)
-    url = "https://api.truelayer.com/data/v1/accounts/{}/transactions?from={}".format(user['truelayer_account_id'],previous.format('YYYY-MM-DDTHH:mm:ss'))
-    headers = {'Authorization': 'Bearer {}'.format(user['truelayer_access_token'])}
+    url = "https://api.truelayer.com/data/v1/accounts/{}/transactions?from={}".format(user['truelayerAccountId'],previous.format('YYYY-MM-DDTHH:mm:ss'))
+    headers = {'Authorization': 'Bearer {}'.format(user['truelayerAccessToken'])}
 
     r = requests.get(url, headers=headers)
     transactions = json.loads(r.text)['results']

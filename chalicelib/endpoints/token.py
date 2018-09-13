@@ -1,22 +1,20 @@
 from chalicelib.database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
-from web3 import Web3
+from chalicelib.web3helper import Web3Helper
 import jwt, os, json
-from utilities import loggedin_middleware, to_object, print_error
+from chalicelib.utilities import loggedin_middleware, to_object, print_error
 
-contract_folder = os.environ.get("CONTRACT_FOLDER", None)
-assert contract_folder != None
-web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
+token_factory = Web3Helper.getContract("TokenFactory.json")
+token_factory_contract_abi = token_factory["abi"]
+network = list(token_factory["networks"].keys())[0]
+token_factory_contract_address = Web3Helper.toChecksumAddress(token_factory["networks"][network]["address"])
 
-with open(contract_folder + "ETT.json") as file:
-  ett_contract_abi = json.loads(file.read())["abi"]
-
-with open(contract_folder + "TokenFactory.json") as file:
-  j = json.loads(file.read())
-  token_factory_contract_abi = j["abi"]
-  network = list(j["networks"].keys())[0]
-  token_factory_contract_address = j["networks"][network]["address"]
+# Set the signature on the contract
+token_factory_contract = Web3Helper.contract(
+  address=Web3Helper.toChecksumAddress(token_factory_contract_address),
+  abi=token_factory_contract_abi
+)
 
 def Token(app):
   @app.route("/tokens", cors=True, methods=["POST"])
@@ -25,50 +23,25 @@ def Token(app):
   def tokens_post():
     request = app.current_request
     data = request.json_body
-    
-    # First create the token
-    # Set the signature on the contract
-    token_factory_contract = web3.eth.contract(
-      address=Web3.toChecksumAddress(token_factory_contract_address),
-      abi=token_factory_contract_abi
-    )
-
     token_data = {
       "name": data["name"],
       "symbol": data["symbol"],
       "decimals": data["decimals"],
       "cutoffTime": int(data["cutoffTime"])
     }
-    print('createETT')
-    print(
+    print(data["symbol"])
+    Web3Helper.transact(
+      token_factory_contract,
+      'createETT',
       0, # initialAmount
       token_data["name"],
       token_data["decimals"],
       token_data["symbol"],
       token_data["cutoffTime"]
     )
-    token_factory_contract.functions.createETT(
-      0, # initialAmount
-      token_data["name"],
-      token_data["decimals"],
-      token_data["symbol"],
-      token_data["cutoffTime"]
-    ).transact({
-      "from": web3.eth.accounts[0]
-    })
-    print('tokenFromSymbol')
-    tokenAddress = token_factory_contract.functions.tokenFromSymbol(
-      token_data["symbol"]
-    ).call({
-      "from": web3.eth.accounts[0]
-    })
-    token_data['address'] = tokenAddress
+    tokenAddress = Web3Helper.call(token_factory_contract,'tokenFromSymbol',token_data["symbol"],)
+    token_data['address'] = Web3Helper.toChecksumAddress(tokenAddress)
     token = Database.find_one("Token", token_data, insert=True)
-
-    # We give all investors 0 starting balance with this coin
-    investors = Database.find("User", {"role": "investor"})
-    for investor in investors:
-      balance = Database.find_one("TokenBalance", {"investorId": investor["id"], "tokenId": token["id"]}, insert=True)
     return to_object(token)
 
   @app.route("/tokens", cors=True, methods=["GET"])
@@ -90,20 +63,11 @@ def Token(app):
   @app.route("/tokens/{tokenId}/balance", cors=True, methods=["GET"])
   @loggedin_middleware(app, "investor")
   @print_error
-  def token_get_holdings(tokenId):
+  def token_get_balance(tokenId):
     request = app.current_request
-    tokenBalance = Database.find_one("TokenBalance", {"tokenId": int(tokenId), "investorId": request.user["id"]})
-    if not tokenBalance: raise NotFoundError("tokenBalance not found with token id {}".format(tokenId))
+    print({"tokenId": int(tokenId), "investorId": request.user["id"]})
+    tokenBalance = Database.find_one("TokenBalance", {"tokenId": int(tokenId), "investorId": request.user["id"]}, insert=True)
     return to_object(tokenBalance)
-
-  @app.route("/tokens/{tokenId}/holdings", cors=True, methods=["GET"])
-  @print_error
-  def token_get_holdings(tokenId):
-    request = app.current_request
-    token = Database.find_one("Token", {"id": int(tokenId)})
-    if not token: raise NotFoundError("token not found with id {}".format(tokenId))
-    token_holdings = Database.find("TokenHoldings", {"tokenId": token["id"]})
-    return to_object(token_holdings)
 
   @app.route("/tokens/{tokenId}/balances", cors=True, methods=["GET"])
   @print_error
@@ -117,6 +81,19 @@ def Token(app):
       token_balance["investor"] = investor
     return to_object(token_balances)
 
+  @app.route("/tokens/{tokenId}/holdings", cors=True, methods=["GET"])
+  @print_error
+  def token_get_holdings(tokenId):
+    request = app.current_request
+    token = Database.find_one("Token", {"id": int(tokenId)})
+    if not token: raise NotFoundError("token not found with id {}".format(tokenId))
+    tokenHoldings = Database.find_one("TokenHoldings", {"tokenId": token["id"]})
+    tokenHoldingsList = Database.find("TokenHolding", {"tokenHoldingsId": tokenHoldings["id"]})
+    for tokenHolding in tokenHoldingsList:
+      tokenHolding['security'] = to_object(Database.find_one('Security', {'id': tokenHolding["securityId"]}))
+      tokenHolding['securityTimestamp'] = to_object(Database.find_one('securityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='createdAt'))
+    return to_object(tokenHoldingsList)
+
   @app.route("/tokens/{tokenId}/holdings", cors=True, methods=["POST"])
   @loggedin_middleware(app, "admin")
   @print_error
@@ -126,39 +103,18 @@ def Token(app):
     token = Database.find_one("Token", {"id": int(tokenId)})
     if not token: raise NotFoundError("token not found with id {}".format(tokenId))
 
-    # Generate the data for hashing
-    holdings = data["holdings"]
-    holdings_dict = {}
-    for h in holdings: holdings_dict[h["ticker"]] = h["stock"]
+    tokenHoldings = Database.find_one("TokenHoldings",{
+      "tokenId": token['id'], 
+      "executionDate": str(datetime.today().date())
+    }, insert=True)
 
-    # need tickers to be sorted
-    tickers = sorted(list(holdings_dict.keys()))
+    for holding in data:
+      security = Database.find_one("Security",{"symbol": holding["symbol"]}, insert=True)
+      tokenHolding = Database.find_one("TokenHolding",{
+        "securityId": security["id"], 
+        "securityAmount": holding["amount"],
+        "tokenHoldingsId": tokenHoldings["id"]
+      }, insert=True)
 
-    holdings_dict_str = json.dumps([{"ticker": key, "stock": holdings_dict[key]} for key in tickers], separators=(",", ":"))
-    holdings_hash = Web3.sha3(text=holdings_dict_str).hex()
-    signature = web3.eth.sign(web3.eth.accounts[0], hexstr=holdings_hash).hex()
-    r = signature[2:][0:64]
-    s = signature[2:][64:128]
-    v = int(signature[2:][128:130]) + 27
 
-    # Set the signature on the contract
-    ett_contract = web3.eth.contract(
-      address=Web3.toChecksumAddress(token["address"]),
-      abi=ett_contract_abi
-    )
-
-    transaction = ett_contract.functions.updateHoldings(v, r, s).transact({"from": web3.eth.accounts[0]})
-
-    # Save the holdings to the database
-    Database.remove("TokenHolding", {"tokenId": token["id"]})
-    
-    for holding in holdings:
-      Database.insert("TokenHolding", {
-        "tokenId": token["id"], 
-        "ticker": holding["ticker"],
-        "stock": holding["stock"]
-      })
-
-    token_holdings = Database.find("TokenHolding", {"tokenId": token["id"]})
-    token_holdings = [to_object(t) for t in token_holdings]
-    return token_holdings
+    return to_object(tokenHoldings)
