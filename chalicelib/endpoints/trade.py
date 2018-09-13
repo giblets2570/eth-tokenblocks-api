@@ -32,12 +32,7 @@ def Trade(app):
     }
     trade = Database.find_one("Trade", tradeData)
 
-    if trade:
-      return to_object(trade, [
-        "id","ik","ek","signature","investorId","brokerId","broker",
-        "createdAt","token","tradeBrokers","investor","executionDate",
-        "expirationTimestampInSec","salt","state","hash"
-      ])
+    if trade: return to_object(trade)
     
     tradeData['state'] = 0
     Database.insert("Trade", tradeData)
@@ -54,11 +49,7 @@ def Trade(app):
 
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-created", data=data)
-    return to_object(trade, [
-      "id","ik","ek","signature","investorId","brokerId","broker",
-      "createdAt","token","tradeBrokers","investor","executionDate",
-      "expirationTimestampInSec","salt","state","hash"
-    ])
+    return to_object(trade)
 
   @app.route("/trades", cors=True, methods=["GET"])
   @loggedin_middleware(app)
@@ -106,12 +97,7 @@ def Trade(app):
           tradeBroker["broker"] = Database.find_one("User", {"id": tradeBroker["brokerId"]}, ["address", "id","name"])
         trade["tradeBrokers"] = tradeBrokers
 
-    trades = [to_object(u, [
-      "id","ik","ek","signature","investorId","brokerId","broker",
-      "createdAt","token","tradeBrokers","investor","executionDate",
-      "expirationTimestampInSec","salt","state","hash"
-    ]) for u in trades]
-    return trades
+    return to_object(trades)
 
   @app.route("/trades/{tradeId}", cors=True, methods=["GET"])
   @loggedin_middleware(app)
@@ -132,12 +118,7 @@ def Trade(app):
     tradeBrokers = Database.find("TradeBroker", {"tradeId": trade["id"]})
     for ob in tradeBrokers: ob["broker"] = Database.find_one("User", {"id": ob["brokerId"]}, ["address", "id","name"])
     trade["tradeBrokers"] = tradeBrokers
-    trade = to_object(trade, [
-      "id","ik","ek","signature","investorId","brokerId","broker",
-      "createdAt","token","tradeBrokers","investor","executionDate",
-      "expirationTimestampInSec","salt","state","hash"
-    ])
-    return trade
+    return to_object(trade)
 
   @app.route("/trades/{tradeId}", cors=True, methods=["PUT"])
   @loggedin_middleware(app)
@@ -150,14 +131,9 @@ def Trade(app):
 
     Database.update("Trade", {"id": int(tradeId)}, data)
     trade = Database.find_one("Trade", {"id": int(tradeId)})
-    trade = to_object(trade, [
-      "id","ik","ek","signature","investorId","brokerId","broker",
-      "createdAt","token","tradeBrokers","investor","executionDate",
-      "expirationTimestampInSec","salt","state","hash"
-    ])
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
-    return trade
+    return to_object(trade)
 
 
   @app.route("/trades/{tradeId}/set-price", cors=True, methods=["PUT"])
@@ -171,15 +147,9 @@ def Trade(app):
     tradeBroker = Database.find_one("TradeBroker", {"tradeId": trade["id"], "brokerId": request.user["id"]})
     if not tradeBroker: raise NotFoundError("tradeBroker not found with trade id {}".format(tradeId))
     Database.update("TradeBroker", {"id": tradeBroker["id"]}, {"price": data["price"]})
-
-    trade = to_object(trade, [
-      "id","ik","ek","signature","investorId","brokerId","broker",
-      "createdAt","token","tradeBrokers","investor","executionDate",
-      "expirationTimestampInSec","salt","state","hash"
-    ])
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
-    return trade
+    return to_object(trade)
 
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])
   @print_error
@@ -197,11 +167,6 @@ def Trade(app):
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = 1
-    trade = to_object(trade, [
-      "id","ik","ek","signature","investorId","brokerId","broker",
-      "createdAt","token","tradeBrokers","investor","executionDate",
-      "expirationTimestampInSec","salt","state","hash"
-    ])
-    return trade
+    return to_object(trade)
 
 

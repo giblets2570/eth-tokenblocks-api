@@ -39,6 +39,7 @@ def Token(app):
       token_data["symbol"],
       token_data["cutoffTime"]
     )
+    # symbolHash = Web3Helper.call(token_factory_contract,'symbolHash',token_data["symbol"],)
     tokenAddress = Web3Helper.call(token_factory_contract,'tokenFromSymbol',token_data["symbol"],)
     token_data['address'] = Web3Helper.toChecksumAddress(tokenAddress)
     token = Database.find_one("Token", token_data, insert=True)

@@ -27,7 +27,8 @@ def User(app):
     request = app.current_request
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))
-    return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId'])
+    user['bankConnected'] = not not user['truelayerAccessToken']
+    return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature', 'bankConnected'])
 
   @app.route('/users/{userId}', cors=True, methods=['PUT'])
   @print_error

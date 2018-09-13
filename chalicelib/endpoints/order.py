@@ -13,11 +13,13 @@ def Order(app):
     query = request.query_params or {}
     single = False
     orders = []
+    print(query)
     if 'single' in query:
       del query['single']
       single = True
-      print(query)
-      orders = [Database.find_one("Order", query)]
+      order = Database.find_one("Order", query)
+      if not order: raise NotFoundError("No order found")
+      orders = [order]
     else:
       orders = Database.find("Order", query)
 

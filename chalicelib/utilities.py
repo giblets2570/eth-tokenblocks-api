@@ -9,8 +9,9 @@ def loggedin_middleware(app, role=None):
   def outer(func):
     def inner(*args, **kwargs):
       headers = app.current_request.headers
+      if 'authorization' not in headers: raise ForbiddenError("You aren't authenticated") 
+      authorization = headers['authorization'].replace('Bearer ', '')
       try:
-        authorization = headers['authorization'].replace('Bearer ', '')
         user = jwt.decode(authorization, secret, algorithms=['HS256'])
         if role and user['role'] != role: raise ForbiddenError("You aren't authenticated")
         setattr(app.current_request, 'user', user)
