@@ -16,12 +16,14 @@ class Web3Helper():
 	def call(cls,contract,_method,*args):
 		print('calling method')
 		method = getattr(contract.functions,_method)
+		print(args)
 		return method(*args).call({'from': account})
 
 	@classmethod
 	def transact(cls,contract,_method,*args):
 		print('transacting method')
 		method = getattr(contract.functions,_method)
+		print(args)
 		return method(*args).buildTransaction({
 			"from": account,
 			"nonce": web3.eth.getTransactionCount(account),

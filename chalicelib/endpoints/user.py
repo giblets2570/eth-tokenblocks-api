@@ -4,6 +4,17 @@ from chalice import NotFoundError, ForbiddenError
 from chalicelib.utilities import loggedin_middleware, to_object, print_error
 from chalicelib.web3helper import Web3Helper
 
+permissions = Web3Helper.getContract("Permissions.json")
+permissions_contract_abi = permissions["abi"]
+network = list(permissions["networks"].keys())[0]
+permissions_contract_address = Web3Helper.toChecksumAddress(permissions["networks"][network]["address"])
+
+# Set the signature on the contract
+permissions_contract = Web3Helper.contract(
+  address=Web3Helper.toChecksumAddress(permissions_contract_address),
+  abi=permissions_contract_abi
+)
+
 def User(app):
 
   @app.route('/users', cors=True, methods=['GET'])
@@ -37,6 +48,13 @@ def User(app):
     data = request.json_body
     if 'address' in data:
       data['address'] = Web3Helper.toChecksumAddress(data['address'])
+      Web3Helper.transact(
+        permissions_contract,
+        'setAuthorized',
+        data['address'],
+        1
+      )
+
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))
     user = Database.update('User', {'id': user['id']}, data, return_updated=True)

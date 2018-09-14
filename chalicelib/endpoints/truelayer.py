@@ -36,11 +36,12 @@ def Truelayer(app):
       {"id": int(user["id"])},
       {"nonce": nonce}
     )
+    url = TL.get_auth_url(nonce)
     return Response(
       body=None,
       status_code=302,
       headers={
-        "Location" : TL.get_auth_url(nonce)
+        "Location" : url
       }
     )
 

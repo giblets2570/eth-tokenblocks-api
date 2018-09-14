@@ -29,7 +29,6 @@ def Token(app):
       "decimals": data["decimals"],
       "cutoffTime": int(data["cutoffTime"])
     }
-    print(data["symbol"])
     Web3Helper.transact(
       token_factory_contract,
       'createETT',
@@ -39,8 +38,12 @@ def Token(app):
       token_data["symbol"],
       token_data["cutoffTime"]
     )
-    # symbolHash = Web3Helper.call(token_factory_contract,'symbolHash',token_data["symbol"],)
+    symbolHash = Web3Helper.call(token_factory_contract,'symbolHash',token_data["symbol"],)
+    print(symbolHash.hex())
     tokenAddress = Web3Helper.call(token_factory_contract,'tokenFromSymbol',token_data["symbol"],)
+    print(tokenAddress)
+    tokenAddress = Web3Helper.call(token_factory_contract,'symbolToAddresses',symbolHash.hex(),)
+    print(tokenAddress)
     token_data['address'] = Web3Helper.toChecksumAddress(tokenAddress)
     token = Database.find_one("Token", token_data, insert=True)
     return to_object(token)

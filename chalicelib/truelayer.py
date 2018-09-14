@@ -2,9 +2,10 @@ import requests, os, arrow, json
 
 truelayer_client_id = os.getenv('TRUELAYER_CLIENT_ID', None)
 truelayer_client_secret = os.getenv('TRUELAYER_CLIENT_SECRET', None)
+truelayer_redirect_uri = os.getenv('TRUELAYER_REDIRECT_URI', None)
 assert truelayer_client_id != None
 assert truelayer_client_secret != None
-
+assert truelayer_redirect_uri != None
 
 class Truelayer(object):
 
@@ -29,7 +30,7 @@ class Truelayer(object):
       "code": code, #  Required Value from step 2
       "client_id": truelayer_client_id, # Required The client ID you received after registering your application.
       "client_secret": truelayer_client_secret, # Required The client secret you received after registering your application.
-      "redirect_uri": 'http://localhost:8000/truelayer-callback', #  Required Your application’s redirect URI
+      "redirect_uri": truelayer_redirect_uri, #  Required Your application’s redirect URI
     }
     r = json.loads(requests.post("https://auth.truelayer.com/connect/token", data=data).text)
     return {
@@ -54,9 +55,8 @@ class Truelayer(object):
   
   @classmethod
   def get_auth_url(cls, nonce):
-    redirect_uri = "http://localhost:8000/truelayer-callback"
     scope = "info%20accounts%20balance%20transactions%20offline_access"
-    auth_url = "https://auth.truelayer.com/?response_type=code&client_id={}&redirect_uri={}&scope={}&nonce=foobar&state={}&enable_mock=true".format(truelayer_client_id,redirect_uri,scope,nonce)
+    auth_url = "https://auth.truelayer.com/?response_type=code&client_id={}&redirect_uri={}&scope={}&nonce=foobar&state={}&enable_mock=true".format(truelayer_client_id,truelayer_redirect_uri,scope,nonce)
 
     return auth_url
 
