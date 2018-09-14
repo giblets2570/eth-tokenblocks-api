@@ -1,15 +1,15 @@
 from web3 import Web3
 import os, requests, json
 provider = os.environ.get("PROVIDER","http://127.0.0.1:8545")
-web3 = Web3(Web3.HTTPProvider(provider))
+w3 = Web3(Web3.HTTPProvider(provider))
 
 privateKey = os.environ.get("PRIVATE_KEY", None)
 account = None
 if privateKey: 
-	account = web3.eth.account.privateKeyToAccount(privateKey)
+	account = w3.eth.account.privateKeyToAccount(privateKey)
 	account = account.address
 else:
-	account = web3.eth.accounts[0]
+	account = w3.eth.accounts[0]
 
 class Web3Helper():
 	@classmethod
@@ -24,13 +24,16 @@ class Web3Helper():
 		print('transacting method')
 		method = getattr(contract.functions,_method)
 		print(args)
-		return method(*args).buildTransaction({
+		tx = method(*args).buildTransaction({
 			"from": account,
-			"nonce": web3.eth.getTransactionCount(account),
+			"nonce": w3.eth.getTransactionCount(account),
 			"gas": 1728712,
-			# "chainId": web3.net.chainId,
-			"gasPrice": web3.toWei("21", "gwei")
+			"chainId": 1,
+			"gasPrice": w3.toWei("21", "gwei")
 		})
+		signedTx = w3.eth.account.signTransaction(tx, private_key=privateKey)
+		return w3.eth.sendRawTransaction(signedTx.rawTransaction)
+
 
 	@classmethod
 	def toChecksumAddress(cls, address):
@@ -38,7 +41,7 @@ class Web3Helper():
 
 	@classmethod
 	def contract(cls, *args, **kwargs):
-		return web3.eth.contract(*args, **kwargs)
+		return w3.eth.contract(*args, **kwargs)
 
 	@classmethod
 	def getContract(cls, filename):
