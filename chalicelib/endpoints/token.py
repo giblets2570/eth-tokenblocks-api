@@ -95,7 +95,7 @@ def Token(app):
     tokenHoldingsList = Database.find("TokenHolding", {"tokenHoldingsId": tokenHoldings["id"]})
     for tokenHolding in tokenHoldingsList:
       tokenHolding['security'] = to_object(Database.find_one('Security', {'id': tokenHolding["securityId"]}))
-      tokenHolding['securityTimestamp'] = to_object(Database.find_one('securityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='createdAt'))
+      tokenHolding['securityTimestamp'] = to_object(Database.find_one('SecurityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='createdAt'))
     return to_object(tokenHoldingsList)
 
   @app.route("/tokens/{tokenId}/holdings", cors=True, methods=["POST"])
