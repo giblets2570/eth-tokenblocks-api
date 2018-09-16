@@ -48,7 +48,7 @@ def User(app):
     data = request.json_body
     if 'address' in data:
       data['address'] = Web3Helper.toChecksumAddress(data['address'])
-      Web3Helper.transact(
+      tx = Web3Helper.transact(
         permissions_contract,
         'setAuthorized',
         data['address'],
@@ -58,7 +58,6 @@ def User(app):
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))
     user = Database.update('User', {'id': user['id']}, data, return_updated=True)
-    print(user)
     return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature'])
 
   @app.route('/users/{userId}/bundle', cors=True)

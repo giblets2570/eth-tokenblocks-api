@@ -101,7 +101,7 @@ CREATE TABLE Trade (
     executionDate DATE,
     expirationTimestampInSec BIGINT UNSIGNED,
     salt INT UNSIGNED,
-    state INT UNSIGNED, -- 0 == created, 1 == confirmed, 2 == verified, 2 == investor cancel, 3 == broker cancel
+    state INT UNSIGNED, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel
     signature VARCHAR(300),
     hash VARCHAR(200),
     sk VARCHAR(200),

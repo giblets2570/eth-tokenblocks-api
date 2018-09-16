@@ -29,18 +29,23 @@ def Token(app):
       "decimals": data["decimals"],
       "cutoffTime": int(data["cutoffTime"])
     }
-    Web3Helper.transact(
-      token_factory_contract,
-      'createETT',
-      0, # initialAmount
-      token_data["name"],
-      token_data["decimals"],
-      token_data["symbol"],
-      token_data["cutoffTime"]
-    )
+    try:
+      tx = Web3Helper.transact(
+        token_factory_contract,
+        'createETT',
+        0, # initialAmount
+        token_data["name"],
+        token_data["decimals"],
+        token_data["symbol"],
+        token_data["cutoffTime"]
+      )
+      print(tx)
+    except Exception as e:
+      # Token has already been put on blockchain
+      pass
+
     tokenAddress = Web3Helper.call(token_factory_contract,'tokenFromSymbol',token_data["symbol"],)
     token_data['address'] = Web3Helper.toChecksumAddress(tokenAddress)
-    print(token_data['symbol'],token_data['address'])
     token = Database.find_one("Token", token_data, insert=True)
     return to_object(token)
 

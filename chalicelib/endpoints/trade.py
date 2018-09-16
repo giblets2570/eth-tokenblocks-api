@@ -129,10 +129,24 @@ def Trade(app):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
 
-    Database.update("Trade", {"id": int(tradeId)}, data)
-    trade = Database.find_one("Trade", {"id": int(tradeId)})
+    trade = Database.update("Trade", {"id": int(tradeId)}, data, return_updated=True)
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
+    return to_object(trade)
+
+  @app.route("/trades/{tradeId}", cors=True, methods=["DELETE"])
+  @loggedin_middleware(app)
+  @print_error
+  def trades_delete(tradeId):
+    request = app.current_request
+    data = request.json_body
+    trade = Database.find_one("Trade", {"id": int(tradeId)})
+    if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
+
+    trade = Database.update("Trade", {"id": int(tradeId)}, {'state': 3}, return_updated=True)
+    # Socket
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
+
     return to_object(trade)
 
 
@@ -167,6 +181,25 @@ def Trade(app):
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = 1
+    return to_object(trade)
+
+  @app.route("/trades/cancel", cors=True, methods=["PUT"])
+  @print_error
+  def trades_cancel():
+    request = app.current_request
+    data = request.json_body
+    tradeHash = data['tradeHash']
+    broker = Database.find_one("User", {"address": data["broker"]})
+    trade = Database.find_one("Trade", {"hash": tradeHash})
+    if not trade: raise NotFoundError("trade not found with hash {}".format(tradeHash))
+    state = 3 if data["investor"] == data["canceller"] else 4
+
+    Database.update("Trade", {"id": trade["id"]}, {"state": state})
+    Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": state})
+
+    # Socket
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
+    trade["state"] = state
     return to_object(trade)
 
 
