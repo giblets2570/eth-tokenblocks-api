@@ -3,7 +3,7 @@ from chalicelib.truelayer import Truelayer
 from chalicelib.database import Database
 from datetime import datetime
 from chalice import Response, NotFoundError
-from chalicelib.utilities import loggedin_middleware, to_object, print_error
+from chalicelib.utilities import *
 from web3 import Web3
 import jwt, os
 
@@ -12,7 +12,7 @@ assert secret != None
 
 def Auth(app):
   @app.route('/auth/signup', cors=True, methods=['POST'])
-  @print_error
+  @printError
   def auth_signup():
     request = app.current_request
     data = request.json_body
@@ -31,10 +31,10 @@ def Auth(app):
         'password': password_hash,
         'role': role
       }, return_inserted=True)
-    return to_object(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId'])
+    return toObject(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId'])
 
   @app.route('/auth/login', cors=True, methods=['POST'])
-  @print_error
+  @printError
   def auth_login():
     request = app.current_request
     data = request.json_body
@@ -46,11 +46,11 @@ def Auth(app):
     })
     if not user: raise NotFoundError('user not found with email {}'.format(email))
     if not pbkdf2_sha256.verify(password, user['password']): raise ForbiddenError('Wrong password')
-    token = jwt.encode(to_object(user, ['id', 'name', 'email', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId']), 
+    token = jwt.encode(toObject(user, ['id', 'name', 'email', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId']), 
       secret, 
       algorithm='HS256'
     )
     return {
-      'user': to_object(user, ['id', 'name', 'email', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId']),
+      'user': toObject(user, ['id', 'name', 'email', 'address', 'role', 'ik', 'spk', 'signature', 'truelayerAccountId']),
       'token': token.decode("utf-8")
     }

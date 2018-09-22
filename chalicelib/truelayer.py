@@ -52,6 +52,10 @@ class Truelayer(object):
     r = requests.get(url, headers=headers)
     result = json.loads(r.text)['results'][0]
     return result
+
+  @classmethod
+  def move_funds(cls, *args, **kwargs):
+    return True
   
   @classmethod
   def get_auth_url(cls, nonce):

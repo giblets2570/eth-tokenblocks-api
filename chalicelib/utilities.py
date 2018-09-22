@@ -5,7 +5,7 @@ import jwt, os
 secret = os.getenv('SECRET', None)
 assert secret != None
 
-def loggedin_middleware(app, role=None):
+def loggedinMiddleware(app, role=None):
   def outer(func):
     def inner(*args, **kwargs):
       headers = app.current_request.headers
@@ -22,7 +22,7 @@ def loggedin_middleware(app, role=None):
     return inner
   return outer
 
-def print_error(func):
+def printError(func):
   def inner(*args, **kwargs):
     try:
       return func(*args, **kwargs)
@@ -31,9 +31,9 @@ def print_error(func):
       raise e
   return inner
 
-def to_object(model, keys=None):
+def toObject(model, keys=None):
   if type(model) == list:
-    return [to_object(m, keys) for m in model]
+    return [toObject(m, keys) for m in model]
   output = dict()
   if not keys: keys = list(model.keys())
   for key in keys:
@@ -45,6 +45,14 @@ def to_object(model, keys=None):
       output[key] = output[key].isoformat()
   return output
 
+
+def passWithoutError(func):
+  def inner(*args, **kwargs):
+    try:
+      func(*args,**kwargs)
+    except Exception as e:
+      pass
+  return inner
 
 def decode(s):
   return "".join("%02x" % ord(c) for c in str(s))

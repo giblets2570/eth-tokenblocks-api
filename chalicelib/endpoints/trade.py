@@ -1,23 +1,17 @@
+import jwt, os, json, requests, math
 from chalicelib.database import Database
+from chalicelib.truelayer import Truelayer as TL
 from datetime import datetime, date
 from chalice import NotFoundError, ForbiddenError
-import jwt, os, json, requests
-from chalicelib.utilities import loggedin_middleware, to_object, print_error
+from chalicelib.web3helper import Web3Helper
+from chalicelib.utilities import *
 
 socket_uri = os.environ.get("SOCKET_URI", None)
 assert socket_uri != None
 
-def passWithoutError(func):
-  def inner(*args, **kwargs):
-    try:
-      func(*args,**kwargs)
-    except Exception as e:
-      pass
-  return inner
-
 def Trade(app):
   @app.route("/trades", cors=True, methods=["POST"])
-  @print_error
+  @printError
   def trades_post():
 
     request = app.current_request
@@ -32,7 +26,7 @@ def Trade(app):
     }
     trade = Database.find_one("Trade", tradeData)
 
-    if trade: return to_object(trade)
+    if trade: return toObject(trade)
     
     tradeData['state'] = 0
     Database.insert("Trade", tradeData)
@@ -49,16 +43,18 @@ def Trade(app):
 
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-created", data=data)
-    return to_object(trade)
+    return toObject(trade)
 
   @app.route("/trades", cors=True, methods=["GET"])
-  @loggedin_middleware(app)
-  @print_error
+  @loggedinMiddleware(app)
+  @printError
   def trades_get():
     request = app.current_request
     trades = []
     tradeBrokers = []
     query = request.query_params or {}
+    if 'state' in query: query['state'] = int(query['state'])
+    print(query)
     page = 0
     page_count = None
     
@@ -85,7 +81,7 @@ def Trade(app):
 
     tokenIds = list(set([o["tokenId"] for o in trades]))
     tokens = [Database.find_one("Token", {"id": t}) for t in tokenIds]
-    tokens = [to_object(t, ["id","address","cutoffTime","symbol","name","decimals"]) for t in tokens]
+    tokens = [toObject(t, ["id","address","cutoffTime","symbol","name","decimals"]) for t in tokens]
     tokens_hash = {token["id"]: token for token in tokens}
     for trade in trades:
       investor = Database.find_one("User", {"id": trade["investorId"]}, ["address", "id","name"])
@@ -97,11 +93,11 @@ def Trade(app):
           tradeBroker["broker"] = Database.find_one("User", {"id": tradeBroker["brokerId"]}, ["address", "id","name"])
         trade["tradeBrokers"] = tradeBrokers
 
-    return to_object(trades)
+    return toObject(trades)
 
   @app.route("/trades/{tradeId}", cors=True, methods=["GET"])
-  @loggedin_middleware(app)
-  @print_error
+  @loggedinMiddleware(app)
+  @printError
   def trades_show(tradeId):
     request = app.current_request
     trade = Database.find_one("Trade", {"id": int(tradeId)})
@@ -118,11 +114,11 @@ def Trade(app):
     tradeBrokers = Database.find("TradeBroker", {"tradeId": trade["id"]})
     for ob in tradeBrokers: ob["broker"] = Database.find_one("User", {"id": ob["brokerId"]}, ["address", "id","name"])
     trade["tradeBrokers"] = tradeBrokers
-    return to_object(trade)
+    return toObject(trade)
 
   @app.route("/trades/{tradeId}", cors=True, methods=["PUT"])
-  @loggedin_middleware(app)
-  @print_error
+  @loggedinMiddleware(app)
+  @printError
   def trades_update(tradeId):
     request = app.current_request
     data = request.json_body
@@ -132,11 +128,11 @@ def Trade(app):
     trade = Database.update("Trade", {"id": int(tradeId)}, data, return_updated=True)
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
-    return to_object(trade)
+    return toObject(trade)
 
   @app.route("/trades/{tradeId}", cors=True, methods=["DELETE"])
-  @loggedin_middleware(app)
-  @print_error
+  @loggedinMiddleware(app)
+  @printError
   def trades_delete(tradeId):
     request = app.current_request
     data = request.json_body
@@ -147,12 +143,12 @@ def Trade(app):
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
 
-    return to_object(trade)
+    return toObject(trade)
 
 
   @app.route("/trades/{tradeId}/set-price", cors=True, methods=["PUT"])
-  @loggedin_middleware(app)
-  @print_error
+  @loggedinMiddleware(app)
+  @printError
   def trades_show(tradeId):
     request = app.current_request
     data = request.json_body
@@ -163,10 +159,10 @@ def Trade(app):
     Database.update("TradeBroker", {"id": tradeBroker["id"]}, {"price": data["price"]})
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
-    return to_object(trade)
+    return toObject(trade)
 
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])
-  @print_error
+  @printError
   def trades_confirmed():
     request = app.current_request
     data = request.json_body
@@ -181,10 +177,10 @@ def Trade(app):
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = 1
-    return to_object(trade)
+    return toObject(trade)
 
   @app.route("/trades/cancel", cors=True, methods=["PUT"])
-  @print_error
+  @printError
   def trades_cancel():
     request = app.current_request
     data = request.json_body
@@ -200,6 +196,33 @@ def Trade(app):
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = state
-    return to_object(trade)
+    return toObject(trade)
 
+  @app.route("/trades/verified", cors=True, methods=["PUT"])
+  @printError
+  def trades_verified():
+    request = app.current_request
+    data = request.json_body
+    tradeHash = data['tradeHash']
+    trade = Database.find_one("Trade", {"hash": tradeHash})
+
+    # First move the funds from the investors bank account to the brokers account
+    moved = TL.move_funds(trade['brokerId'], trade['investorId'])
+
+    if not moved:
+      # Need to alert the smart contract that this trade hasn't worked
+      return {'message': "Funds have not been moved"}
+
+    # Verify the trade
+    Database.update("Trade", {"id": trade["id"]}, {"state": 2})
+    
+    # get todays nav and totalSupply
+    token = Database.find_one('Token', {'id': trade['tokenId']})
+    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": trade['executionDate'], "tokenId": trade["tokenId"]})
+    token_contract = Web3Helper.getContract("ETT.json", token['address'])
+    totalSupply = Web3Helper.call(token_contract,'totalSupply',)
+
+    # find number of tokens user allocated
+    amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
+    numberTokens = math.floor(amountInvested * totalSupply / navTimestamp['value'])
 

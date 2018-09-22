@@ -2,18 +2,12 @@ from chalicelib.truelayer import Truelayer as TL
 from chalicelib.database import Database
 from chalicelib.web3helper import Web3Helper
 from chalice import Response, NotFoundError
+from chalicelib.web3helper import Web3Helper
 import os, json, random
 
 front_end_url = os.environ.get('FRONT_END','http://localhost:3001/#/')
 
-permissions = Web3Helper.getContract("Permissions.json")
-permissions_contract_abi = permissions["abi"]
-network = list(permissions["networks"].keys())[0]
-permissions_contract_address = permissions["networks"][network]["address"]
-permissions_contract = permissions_contract = Web3Helper.contract(
-  address=Web3Helper.toChecksumAddress(permissions_contract_address),
-  abi=permissions_contract_abi
-)
+permissions_contract = Web3Helper.getContract("Permissions.json")
 
 def refresh_user_token(user):
   Database.update(

@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS TokenHoldings;
 DROP TABLE IF EXISTS TokenBalance;
 DROP TABLE IF EXISTS SecurityTimestamp;
 DROP TABLE IF EXISTS Security;
+DROP TABLE IF EXISTS NavTimestamp;
 DROP TABLE IF EXISTS Token;
 DROP TABLE IF EXISTS User;
 
@@ -37,9 +38,21 @@ CREATE TABLE Token (
     cutoffTime INT UNSIGNED,
     symbol VARCHAR(50),
     name VARCHAR(50),
+    fee INT UNSIGNED,
+    ownerId INT UNSIGNED,
     decimals SMALLINT UNSIGNED,
-    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ownerId) REFERENCES User(id)
 );
+
+CREATE TABLE NavTimestamp (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    tokenId INT UNSIGNED,
+    value INT UNSIGNED,
+    executionDate DATE, 
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tokenId) REFERENCES Token(id)
+);  
 
 CREATE TABLE Security (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -101,7 +114,7 @@ CREATE TABLE Trade (
     executionDate DATE,
     expirationTimestampInSec BIGINT UNSIGNED,
     salt INT UNSIGNED,
-    state INT UNSIGNED, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel
+    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel
     signature VARCHAR(300),
     hash VARCHAR(200),
     sk VARCHAR(200),
@@ -129,8 +142,11 @@ CREATE TABLE `Order` (
     brokerId INT UNSIGNED,
     tokenId INT UNSIGNED,
     signature VARCHAR(300),
-    verified BOOLEAN DEFAULT FALSE,
+    amount INT,
+    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == complete
     executionDate DATE,
+    salt INT UNSIGNED,
+    hash VARCHAR(200),
     FOREIGN KEY (brokerId) REFERENCES User(id),
     FOREIGN KEY (tokenId) REFERENCES Token(id)
 );
@@ -152,5 +168,3 @@ CREATE TABLE OrderTrade (
     FOREIGN KEY (orderId) REFERENCES `Order`(id),
     FOREIGN KEY (tradeId) REFERENCES Trade(id)
 );
-
-

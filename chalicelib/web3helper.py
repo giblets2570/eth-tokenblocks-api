@@ -14,26 +14,26 @@ else:
 class Web3Helper():
 	@classmethod
 	def call(cls,contract,_method,*args):
-		print('calling method')
 		method = getattr(contract.functions,_method)
-		print(args)
 		return method(*args).call({'from': account})
 
 	@classmethod
 	def transact(cls,contract,_method,*args):
-		print('transacting method')
 		method = getattr(contract.functions,_method)
-		print(args)
-		tx = method(*args).buildTransaction({
-			"from": account,
-			"nonce": w3.eth.getTransactionCount(account),
-			"gas": 1728712,
-			"chainId": 1,
-			"gasPrice": w3.toWei("21", "gwei")
-		})
-		signedTx = w3.eth.account.signTransaction(tx, private_key=privateKey)
-		return w3.eth.sendRawTransaction(signedTx.rawTransaction)
+		return method(*args).transact({'from': account})
+		# tx = method(*args).buildTransaction({
+		# 	"from": account,
+		# 	"nonce": w3.eth.getTransactionCount(account),
+		# 	"gas": 8000029,
+  #       	"gasPrice": 20000000000,
+		# 	"chainId": 1,
+		# })
+		# signedTx = w3.eth.account.signTransaction(tx, private_key=privateKey)
+		# return w3.eth.sendRawTransaction(signedTx.rawTransaction)
 
+	@classmethod
+	def account(cls):
+		return cls.toChecksumAddress(account)
 
 	@classmethod
 	def toChecksumAddress(cls, address):
@@ -44,10 +44,22 @@ class Web3Helper():
 		return w3.eth.contract(*args, **kwargs)
 
 	@classmethod
-	def getContract(cls, filename):
+	def getContract(cls, filename, address=None):
+		contract_json = None
 		if os.environ.get('CONTRACT_FOLDER', None):
 			folder = os.environ.get('CONTRACT_FOLDER', None)
 			with open(folder + filename, 'r') as file:
-				return json.loads(file.read())
+				contract_json = json.loads(file.read())
 		else:
-			return requests.get("https://s3.eu-west-2.amazonaws.com/tokenblocks-contracts/{}".format(filename)).json()
+			contract_json = requests.get("https://s3.eu-west-2.amazonaws.com/tokenblocks-contracts/{}".format(filename)).json()
+
+		abi = contract_json["abi"]
+		if not address:
+			network = list(contract_json["networks"].keys())[0]
+			address = Web3Helper.toChecksumAddress(contract_json["networks"][network]["address"])
+
+		contract = Web3Helper.contract(
+			address=Web3Helper.toChecksumAddress(address),
+			abi=abi
+		)
+		return contract
