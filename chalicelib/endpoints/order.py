@@ -103,7 +103,7 @@ def Order(app):
     # find the token
     token = Database.find_one("Token", {"id": order["tokenId"]})
     # Here I need to calculate the NAV of the fund
-    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": executionDate})
+    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": executionDate, "tokenId": order["tokenId"]})
 
     # if nav already calculated today
     if navTimestamp: 
