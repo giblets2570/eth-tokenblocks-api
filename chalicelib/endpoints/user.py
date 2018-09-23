@@ -67,7 +67,7 @@ def User(app):
     if not token: raise NotFoundError('token not found with address {}'.format(data["token"]))
     user = Database.find_one("User", {'address': data["owner"]})
     if not user: raise NotFoundError('user not found with address {}'.format(data["owner"]))
-    userBalance = Database.find_one("TokenBalance", {'investorId': user['id'], "tokenId": token["id"]}, insert=True)
+    userBalance = Database.find_one("TokenBalance", {'userId': user['id'], "tokenId": token["id"]}, insert=True)
     newBalance = userBalance['balance'] + data["newTotalSupply"] - data["oldTotalSupply"]
     userBalance = Database.update("TokenBalance", {"id": userBalance["id"]}, {"balance": newBalance}, return_updated=True)
     return toObject(userBalance)
@@ -84,11 +84,11 @@ def User(app):
     if not toUser: raise NotFoundError('user not found with address {}'.format(data["to"]))
     value = data['value']
 
-    fromBalance = Database.find_one("TokenBalance", {'investorId': fromUser['id'], "tokenId": token["id"]}, insert=True)
+    fromBalance = Database.find_one("TokenBalance", {'userId': fromUser['id'], "tokenId": token["id"]}, insert=True)
     newFromBalance = userBalance['balance'] - value
     fromBalance = Database.update("TokenBalance", {"id": fromBalance["id"]}, {"balance": newFromBalance}, return_updated=True)
 
-    toBalance = Database.find_one("TokenBalance", {'investorId': toUser['id'], "tokenId": token["id"]}, insert=True)
+    toBalance = Database.find_one("TokenBalance", {'userId': toUser['id'], "tokenId": token["id"]}, insert=True)
     newToBalance = userBalance['balance'] - value
     toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)
 

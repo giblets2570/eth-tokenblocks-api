@@ -111,7 +111,7 @@ def Order(app):
       return {"message": "Already calculated"}
 
     # get yesterdays nav and totalSupply
-    yesterdaysExecutionDate = arrow.get(order['executionDate']).shift(days=-1).format('YYYY-MM-DD')
+    yesterdaysExecutionDate = arrow.get(executionDate).shift(days=-1).format('YYYY-MM-DD')
     yesterdaysNavTimestamp = Database.find_one('NavTimestamp', {"executionDate": yesterdaysExecutionDate, "tokenId": order["tokenId"]}, insert=True)
     yesterdaysValue = yesterdaysNavTimestamp['value']
 
@@ -124,11 +124,12 @@ def Order(app):
     Database.insert('NavTimestamp', {"executionDate": executionDate, "tokenId": order["tokenId"], "value": newNav})
 
     # create the new tokens
+    executionDateString = arrow.get(executionDate).format('YYYY-MM-DD')
     token_contract = Web3Helper.getContract("ETT.json", token['address'])
     totalSupply = Web3Helper.call(token_contract,'totalSupply',)
     tokensSupplyChange = math.floor(totalSupply * valueOfNewHoldings / valueWithoutHoldingsUpdate)
-    tx = Web3Helper.transact(token_contract, 'updateTotalSupply', tokensSupplyChange, executionDate)
-    tx = Web3Helper.transact(token_contract, 'updateNAV', newNav, executionDate)
+    tx = Web3Helper.transact(token_contract, 'updateTotalSupply', tokensSupplyChange, executionDateString)
+    tx = Web3Helper.transact(token_contract, 'updateNAV', newNav, executionDateString)
 
     print("Order completed and created new tokens")
     return {"message": "Order completed and created new tokens"}

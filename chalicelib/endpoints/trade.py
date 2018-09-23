@@ -1,9 +1,10 @@
-import jwt, os, json, requests, math
+import jwt, os, json, requests, math, arrow
 from chalicelib.database import Database
 from chalicelib.truelayer import Truelayer as TL
 from datetime import datetime, date
 from chalice import NotFoundError, ForbiddenError
 from chalicelib.web3helper import Web3Helper
+from chalicelib.cryptr import Cryptor
 from chalicelib.utilities import *
 
 socket_uri = os.environ.get("SOCKET_URI", None)
@@ -165,13 +166,15 @@ def Trade(app):
 
   @app.route("/trades/{tradeId}/claim", cors=True, methods=["PUT"])
   @printError
-  def trades_distribute():
-    request = app.current_request
-    data = request.json_body
+  def trades_claim(tradeId):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
+    print(trade['sk'])
+    print(trade['nominalAmount'])
+    print(Cryptor.decryptInput(trade['nominalAmount'], trade['sk']))
+    amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
 
     if trade['state'] != 1:
-      return {'message': 'Trade is in state {}, requires state 1'.trade['state']}
+      return {'message': 'Trade is in state {}, requires state 1'.format(trade['state'])}
 
     # First move the funds from the investors bank account to the brokers account
     moved = TL.move_funds(trade['brokerId'], trade['investorId'])
@@ -187,10 +190,9 @@ def Trade(app):
     token = Database.find_one('Token', {'id': trade['tokenId']})
     navTimestamp = Database.find_one('NavTimestamp', {"executionDate": trade['executionDate'], "tokenId": trade["tokenId"]})
     tokenContract = Web3Helper.getContract("ETT.json", token['address'])
-    totalSupply = Web3Helper.call(tokenContract,'dateTotalSupply',trade['executionDate'],)
+    totalSupply = Web3Helper.call(tokenContract,'dateTotalSupply',arrow.get(trade['executionDate']).format('YYYY-MM-DD'),)
 
     # find number of tokens user allocated
-    amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
     numberTokens = 0 if not navTimestamp['value'] else math.floor(amountInvested * totalSupply / navTimestamp['value'])
 
     # now ask the contract to distribute the tokens (maybe should be the investor that does this)
@@ -204,7 +206,7 @@ def Trade(app):
       token['token'], 
       numberTokens,
     )
-    return {"message": "tokens distributed"}
+    return {"message": "Tokens distributed"}
 
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])
   @printError
