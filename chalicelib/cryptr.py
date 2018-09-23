@@ -43,7 +43,8 @@ class Cryptor(object):
     
     @classmethod
     def generate_iv(cls, size=16):
-        return Random.get_random_bytes(size)
+        return bytes('0'*size, 'utf8')
+        # return Random.get_random_bytes(size)
     
     @classmethod
     def encrypt(cls, in_string, in_key, in_iv=None):
@@ -80,27 +81,25 @@ class Cryptor(object):
         return cls._unpad_string(decrypted.decode('utf8'))
 
     @classmethod
-    def decryptInput(cls, in_encrypted, in_key):
+    def decryptInput(cls, ciphertext, in_key):
         '''
         Return encrypted string.
         @in_encrypted: Base64 encoded 
         @key: hexified key
         '''
         key = binascii.a2b_hex(in_key)
-        iv = binascii.a2b_base64(in_encrypted[:24])
-        ciphertext = in_encrypted[24:]
+        iv = binascii.a2b_base64('MDAwMDAwMDAwMDAwMDAwMA==')
         aes = AES.new(key, AES.MODE_CFB, iv, segment_size=128)
-        decrypted = aes.decrypt(binascii.a2b_base64(ciphertext).rstrip())
+        decrypted = aes.decrypt(binascii.a2b_hex(ciphertext).rstrip())
         return cls._unpad_string(decrypted.decode('utf8'))
 
 if __name__ == '__main__':
-    to_encrypt = 'thing i want to encrypt'
+    to_encrypt = 'i took a pill in ibiza'
     iv, encrypted = Cryptor.encrypt(to_encrypt, Cryptor.KEY)
-    
+    print(encrypted.hex())
     total_encrypted = binascii.b2a_base64(binascii.a2b_hex(iv)).rstrip().decode('utf8') + binascii.b2a_base64(encrypted).rstrip().decode('utf8')
-    print(binascii.a2b_hex(iv).hex(), len(binascii.a2b_hex(iv).hex()))
-    print(encrypted.hex(), len(encrypted.hex()))
-    print(len(total_encrypted))
-    decrypted = Cryptor.decryptInput(total_encrypted, Cryptor.KEY)
-
+    print(binascii.b2a_hex(encrypted).rstrip().decode('utf8'))
+    decrypted = Cryptor.decryptInput(encrypted.hex(), Cryptor.KEY)
     print(decrypted)
+
+
