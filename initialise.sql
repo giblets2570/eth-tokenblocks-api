@@ -77,11 +77,11 @@ CREATE TABLE SecurityTimestamp (
 CREATE TABLE TokenBalance (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     tokenId INT UNSIGNED,
-    investorId INT UNSIGNED,
+    userId INT UNSIGNED,
     balance BIGINT UNSIGNED DEFAULT 0,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tokenId) REFERENCES Token(id),
-    FOREIGN KEY (investorId) REFERENCES User(id)
+    FOREIGN KEY (userId) REFERENCES User(id)
 );
 
 CREATE TABLE TokenHoldings (

@@ -9,6 +9,8 @@ from chalicelib.utilities import *
 socket_uri = os.environ.get("SOCKET_URI", None)
 assert socket_uri != None
 
+tradeKernelContract = Web3Helper.getContract("TradeKernel.json")
+
 def Trade(app):
   @app.route("/trades", cors=True, methods=["POST"])
   @printError
@@ -161,6 +163,49 @@ def Trade(app):
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     return toObject(trade)
 
+  @app.route("/trades/{tradeId}/claim", cors=True, methods=["PUT"])
+  @printError
+  def trades_distribute():
+    request = app.current_request
+    data = request.json_body
+    trade = Database.find_one("Trade", {"id": int(tradeId)})
+
+    if trade['state'] != 1:
+      return {'message': 'Trade is in state {}, requires state 1'.trade['state']}
+
+    # First move the funds from the investors bank account to the brokers account
+    moved = TL.move_funds(trade['brokerId'], trade['investorId'])
+
+    if not moved:
+      # Need to alert the smart contract that this trade hasn't worked
+      return {'message': "Funds have not been moved, tokens not distributed"}
+
+    # Verify the trade
+    Database.update("Trade", {"id": trade["id"]}, {"state": 2})
+    
+    # get todays nav and totalSupply
+    token = Database.find_one('Token', {'id': trade['tokenId']})
+    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": trade['executionDate'], "tokenId": trade["tokenId"]})
+    tokenContract = Web3Helper.getContract("ETT.json", token['address'])
+    totalSupply = Web3Helper.call(tokenContract,'dateTotalSupply',trade['executionDate'],)
+
+    # find number of tokens user allocated
+    amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
+    numberTokens = 0 if not navTimestamp['value'] else math.floor(amountInvested * totalSupply / navTimestamp['value'])
+
+    # now ask the contract to distribute the tokens (maybe should be the investor that does this)
+    investor = Database.find_one("User", {"id": trade["investorId"]})
+    tradeKernelContract = Web3Helper.getContract("TradeKernel.json")
+    Web3Helper.transact(
+      tradeKernelContract,
+      'distributeTokens',
+      trade['hash'], 
+      investor['address'], 
+      token['token'], 
+      numberTokens,
+    )
+    return {"message": "tokens distributed"}
+
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])
   @printError
   def trades_confirmed():
@@ -196,33 +241,4 @@ def Trade(app):
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = state
-    return toObject(trade)
-
-  @app.route("/trades/verified", cors=True, methods=["PUT"])
-  @printError
-  def trades_verified():
-    request = app.current_request
-    data = request.json_body
-    tradeHash = data['tradeHash']
-    trade = Database.find_one("Trade", {"hash": tradeHash})
-
-    # First move the funds from the investors bank account to the brokers account
-    moved = TL.move_funds(trade['brokerId'], trade['investorId'])
-
-    if not moved:
-      # Need to alert the smart contract that this trade hasn't worked
-      return {'message': "Funds have not been moved"}
-
-    # Verify the trade
-    Database.update("Trade", {"id": trade["id"]}, {"state": 2})
-    
-    # get todays nav and totalSupply
-    token = Database.find_one('Token', {'id': trade['tokenId']})
-    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": trade['executionDate'], "tokenId": trade["tokenId"]})
-    token_contract = Web3Helper.getContract("ETT.json", token['address'])
-    totalSupply = Web3Helper.call(token_contract,'totalSupply',)
-
-    # find number of tokens user allocated
-    amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
-    numberTokens = math.floor(amountInvested * totalSupply / navTimestamp['value'])
-
+    return toObject(trade) 

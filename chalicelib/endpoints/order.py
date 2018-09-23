@@ -99,10 +99,11 @@ def Order(app):
       print("There are still orders waiting to complete")
       return {"message": "Order completed"}
 
+    executionDate = order["executionDate"]
     # find the token
     token = Database.find_one("Token", {"id": order["tokenId"]})
     # Here I need to calculate the NAV of the fund
-    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": order["executionDate"]})
+    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": executionDate})
 
     # if nav already calculated today
     if navTimestamp: 
@@ -110,9 +111,9 @@ def Order(app):
       return {"message": "Already calculated"}
 
     # get yesterdays nav and totalSupply
-    # yesterdaysExecutionDate = arrow.get(order['executionDate']).shift(days=-1).format('YYYY-MM-DD')
-    # yesterdaysNavTimestamp = Database.find_one('NavTimestamp', {"executionDate": yesterdaysExecutionDate, "tokenId": order["tokenId"]})
-    # yesterdaysValue = yesterdaysNavTimestamp['value']
+    yesterdaysExecutionDate = arrow.get(order['executionDate']).shift(days=-1).format('YYYY-MM-DD')
+    yesterdaysNavTimestamp = Database.find_one('NavTimestamp', {"executionDate": yesterdaysExecutionDate, "tokenId": order["tokenId"]}, insert=True)
+    yesterdaysValue = yesterdaysNavTimestamp['value']
 
     ######################################################
     # lets just set this to £1,000,000 for now
@@ -120,13 +121,14 @@ def Order(app):
     valueWithoutHoldingsUpdate = 100000000
     valueOfNewHoldings = 25000
     newNav = valueWithoutHoldingsUpdate + valueOfNewHoldings
+    Database.insert('NavTimestamp', {"executionDate": executionDate, "tokenId": order["tokenId"], "value": newNav})
 
     # create the new tokens
     token_contract = Web3Helper.getContract("ETT.json", token['address'])
     totalSupply = Web3Helper.call(token_contract,'totalSupply',)
     tokensSupplyChange = math.floor(totalSupply * valueOfNewHoldings / valueWithoutHoldingsUpdate)
-    tx = Web3Helper.transact(token_contract,'updateTotalSupply',tokensSupplyChange,)
-    tx = Web3Helper.transact(token_contract,'updateNAV',newNav,)
+    tx = Web3Helper.transact(token_contract, 'updateTotalSupply', tokensSupplyChange, executionDate)
+    tx = Web3Helper.transact(token_contract, 'updateNAV', newNav, executionDate)
 
     print("Order completed and created new tokens")
     return {"message": "Order completed and created new tokens"}
