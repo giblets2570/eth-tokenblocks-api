@@ -6,7 +6,6 @@ from chalice import NotFoundError, ForbiddenError
 from chalicelib.web3helper import Web3Helper
 from chalicelib.cryptr import Cryptor
 from chalicelib.utilities import *
-
 socket_uri = os.environ.get("SOCKET_URI", None)
 assert socket_uri != None
 
@@ -168,11 +167,9 @@ def Trade(app):
   @printError
   def trades_claim(tradeId):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
-    print(trade['sk'])
-    print(trade['nominalAmount'])
-    print(Cryptor.decryptInput(trade['nominalAmount'], trade['sk']))
-    amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
-
+    decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
+    # amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
+    amountInvested = int(decrypted.split(':')[1])
     if trade['state'] != 1:
       return {'message': 'Trade is in state {}, requires state 1'.format(trade['state'])}
 
@@ -182,9 +179,6 @@ def Trade(app):
     if not moved:
       # Need to alert the smart contract that this trade hasn't worked
       return {'message': "Funds have not been moved, tokens not distributed"}
-
-    # Verify the trade
-    Database.update("Trade", {"id": trade["id"]}, {"state": 2})
     
     # get todays nav and totalSupply
     token = Database.find_one('Token', {'id': trade['tokenId']})
@@ -203,9 +197,11 @@ def Trade(app):
       'distributeTokens',
       trade['hash'], 
       investor['address'], 
-      token['token'], 
+      token['address'], 
       numberTokens,
     )
+
+    Database.update("Trade", {"id": trade["id"]}, {"state": 2, "numberTokens": numberTokens})
     return {"message": "Tokens distributed"}
 
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])

@@ -5,6 +5,7 @@ from .token import Token
 from .trade import Trade
 from .security import Security
 from .truelayer import Truelayer
+from .error import Error
 
 def createEndpoints(app):
 	Auth(app)
@@ -12,5 +13,6 @@ def createEndpoints(app):
 	Token(app)
 	Trade(app)
 	Order(app)
+	Error(app)
 	Security(app)
 	Truelayer(app)

@@ -87,6 +87,7 @@ class Cryptor(object):
         @in_encrypted: Base64 encoded 
         @key: hexified key
         '''
+        if ciphertext[:2] == "0x": ciphertext = ciphertext[2:]
         key = binascii.a2b_hex(in_key)
         iv = binascii.a2b_base64('MDAwMDAwMDAwMDAwMDAwMA==')
         aes = AES.new(key, AES.MODE_CFB, iv, segment_size=128)

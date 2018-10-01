@@ -72,6 +72,12 @@ def Token(app):
     request = app.current_request
     token = Database.find_one("Token", {"id": int(tokenId)})
     if not token: raise NotFoundError("token not found with id {}".format(tokenId))
+    tokenHoldings = Database.find_one("TokenHoldings", {"tokenId": token["id"]})
+    tokenHoldingsList = Database.find("TokenHolding", {"tokenHoldingsId": tokenHoldings["id"]})
+    for tokenHolding in tokenHoldingsList:
+      tokenHolding['security'] = toObject(Database.find_one('Security', {'id': tokenHolding["securityId"]}))
+      tokenHolding['securityTimestamp'] = toObject(Database.find_one('SecurityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='createdAt'))
+    token['holdings'] = toObject(tokenHoldingsList)
     return toObject(token)
 
   @app.route("/tokens/{tokenId}/balance", cors=True, methods=["GET"])

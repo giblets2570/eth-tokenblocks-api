@@ -14,8 +14,9 @@ def User(app):
   def users_get():
     request = app.current_request
     users = None
-    if 'role' in request.query_params:
-      role = request.query_params['role']
+    query_params = request.query_params or {}
+    if 'role' in query_params:
+      role = query_params['role']
       users = Database.find("User", {'role': role})
       users = [u for u in users if u['ik']]
     else:
@@ -85,11 +86,11 @@ def User(app):
     value = data['value']
 
     fromBalance = Database.find_one("TokenBalance", {'userId': fromUser['id'], "tokenId": token["id"]}, insert=True)
-    newFromBalance = userBalance['balance'] - value
+    newFromBalance = fromBalance['balance'] - value
     fromBalance = Database.update("TokenBalance", {"id": fromBalance["id"]}, {"balance": newFromBalance}, return_updated=True)
 
     toBalance = Database.find_one("TokenBalance", {'userId': toUser['id'], "tokenId": token["id"]}, insert=True)
-    newToBalance = userBalance['balance'] - value
+    newToBalance = toBalance['balance'] - value
     toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)
 
     return {"message": "Funds transferred"}

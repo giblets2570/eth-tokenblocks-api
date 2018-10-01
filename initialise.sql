@@ -119,6 +119,7 @@ CREATE TABLE Trade (
     hash VARCHAR(200),
     sk VARCHAR(200),
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    numberTokens INT,
     FOREIGN KEY (tokenId) REFERENCES Token(id),
     FOREIGN KEY (brokerId) REFERENCES User(id),
     FOREIGN KEY (investorId) REFERENCES User(id)
