@@ -2,9 +2,6 @@ from datetime import datetime, date
 from chalice import ForbiddenError
 import jwt, os
 
-secret = os.getenv('SECRET', None)
-assert secret != None
-
 def loggedinMiddleware(app, role=None):
   def outer(func):
     def inner(*args, **kwargs):
@@ -12,6 +9,8 @@ def loggedinMiddleware(app, role=None):
       if 'authorization' not in headers: raise ForbiddenError("You aren't authenticated") 
       authorization = headers['authorization'].replace('Bearer ', '')
       try:
+        secret = os.getenv('SECRET', None)
+        assert secret != None
         user = jwt.decode(authorization, secret, algorithms=['HS256'])
         if role and user['role'] != role: raise ForbiddenError("You aren't authenticated")
         setattr(app.current_request, 'user', user)

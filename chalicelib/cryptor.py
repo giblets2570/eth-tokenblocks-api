@@ -22,7 +22,6 @@ class Cryptor(object):
     '''
     
     # AES-256 key (32 bytes)
-    KEY = "01ab38d5e05c92aa098921d9d4626107133c7e2ab0e4849558921ebcc242bcb0"
     BLOCK_SIZE = 16
     
     @classmethod
@@ -95,12 +94,13 @@ class Cryptor(object):
         return cls._unpad_string(decrypted.decode('utf8'))
 
 if __name__ == '__main__':
+    key = "01ab38d5e05c92aa098921d9d4626107133c7e2ab0e4849558921ebcc242bcb0"
     to_encrypt = 'i took a pill in ibiza'
-    iv, encrypted = Cryptor.encrypt(to_encrypt, Cryptor.KEY)
+    iv, encrypted = Cryptor.encrypt(to_encrypt, key)
     print(encrypted.hex())
     total_encrypted = binascii.b2a_base64(binascii.a2b_hex(iv)).rstrip().decode('utf8') + binascii.b2a_base64(encrypted).rstrip().decode('utf8')
     print(binascii.b2a_hex(encrypted).rstrip().decode('utf8'))
-    decrypted = Cryptor.decryptInput(encrypted.hex(), Cryptor.KEY)
+    decrypted = Cryptor.decryptInput(encrypted.hex(), key)
     print(decrypted)
 
 

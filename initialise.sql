@@ -41,6 +41,7 @@ CREATE TABLE Token (
     fee INT UNSIGNED,
     ownerId INT UNSIGNED,
     decimals SMALLINT UNSIGNED,
+    totalSupply INT UNSIGNED,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ownerId) REFERENCES User(id)
 );
@@ -114,7 +115,7 @@ CREATE TABLE Trade (
     executionDate DATE,
     expirationTimestampInSec BIGINT UNSIGNED,
     salt INT UNSIGNED,
-    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel
+    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel, 5 == claimed
     signature VARCHAR(300),
     hash VARCHAR(200),
     sk VARCHAR(200),

@@ -1,6 +1,8 @@
-from chalice import Chalice, Rate
+from chalice import Chalice
+
 app = Chalice(app_name='ett-api')
 app.debug = True
+
 from chalicelib.endpoints import init as endpoints
 from chalicelib.scheduled import init as scheduled
 

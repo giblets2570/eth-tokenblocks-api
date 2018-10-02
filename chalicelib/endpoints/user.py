@@ -49,7 +49,7 @@ def User(app):
 
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))
-    user = Database.update('User', {'id': user['id']}, data, return_updated=True)
+    user = Database.update('User', {'id': user['id']}, data, return_updated=True)[0]
     return toObject(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature'])
 
   @app.route('/users/{userId}/bundle', cors=True, methods=['GET'])
@@ -70,7 +70,7 @@ def User(app):
     if not user: raise NotFoundError('user not found with address {}'.format(data["owner"]))
     userBalance = Database.find_one("TokenBalance", {'userId': user['id'], "tokenId": token["id"]}, insert=True)
     newBalance = userBalance['balance'] + data["newTotalSupply"] - data["oldTotalSupply"]
-    userBalance = Database.update("TokenBalance", {"id": userBalance["id"]}, {"balance": newBalance}, return_updated=True)
+    userBalance = Database.update("TokenBalance", {"id": userBalance["id"]}, {"balance": newBalance}, return_updated=True)[0]
     return toObject(userBalance)
 
   @app.route('/users/balance/transfer', cors=True, methods=['PUT'])
@@ -87,11 +87,11 @@ def User(app):
 
     fromBalance = Database.find_one("TokenBalance", {'userId': fromUser['id'], "tokenId": token["id"]}, insert=True)
     newFromBalance = fromBalance['balance'] - value
-    fromBalance = Database.update("TokenBalance", {"id": fromBalance["id"]}, {"balance": newFromBalance}, return_updated=True)
+    fromBalance = Database.update("TokenBalance", {"id": fromBalance["id"]}, {"balance": newFromBalance}, return_updated=True)[0]
 
     toBalance = Database.find_one("TokenBalance", {'userId': toUser['id'], "tokenId": token["id"]}, insert=True)
     newToBalance = toBalance['balance'] - value
-    toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)
+    toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)[0]
 
     return {"message": "Funds transferred"}
 

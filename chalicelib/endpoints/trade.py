@@ -4,8 +4,9 @@ from chalicelib.truelayer import Truelayer as TL
 from datetime import datetime, date
 from chalice import NotFoundError, ForbiddenError
 from chalicelib.web3helper import Web3Helper
-from chalicelib.cryptr import Cryptor
+from chalicelib.cryptor import Cryptor
 from chalicelib.utilities import *
+
 socket_uri = os.environ.get("SOCKET_URI", None)
 assert socket_uri != None
 
@@ -56,22 +57,27 @@ def Trade(app):
     tradeBrokers = []
     query = request.query_params or {}
     if 'state' in query: query['state'] = int(query['state'])
-    print(query)
     page = 0
     page_count = None
+    total = None
     
     if 'page' in query:
-      page = query['page']
+      page = int(query['page'])
       del query['page']
     if 'page_count' in query:
-      page_count = query['page_count']
+      page_count = int(query['page_count'])
       del query['page_count']
 
     if request.user["role"] == "investor":
       query["investorId"] = request.user["id"]
-      trades = Database.find("Trade", query, page=page, page_count=page_count)
+      dbRes = Database.find("Trade", query, page=page, page_count=page_count)
+      trades = dbRes['data']
+      total = dbRes['total']
+
     elif request.user["role"] == "broker":
-      tradeBrokers = Database.find("TradeBroker", {"brokerId": request.user["id"]}, page=page, page_count=page_count)
+      dbRes = Database.find("TradeBroker", {"brokerId": request.user["id"]}, page=page, page_count=page_count)
+      tradeBrokers = dbRes['data']
+      total = dbRes["total"]
       tradeIds = [tradeBroker["tradeId"] for tradeBroker in tradeBrokers]
       for i, tradeId in enumerate(tradeIds):
         query["id"] = tradeId
@@ -95,7 +101,7 @@ def Trade(app):
           tradeBroker["broker"] = Database.find_one("User", {"id": tradeBroker["brokerId"]}, ["address", "id","name"])
         trade["tradeBrokers"] = tradeBrokers
 
-    return toObject(trades)
+    return {"total": total, "data": toObject(trades), "page": page, "page_count": page_count}
 
   @app.route("/trades/{tradeId}", cors=True, methods=["GET"])
   @loggedinMiddleware(app)
@@ -127,7 +133,7 @@ def Trade(app):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
 
-    trade = Database.update("Trade", {"id": int(tradeId)}, data, return_updated=True)
+    trade = Database.update("Trade", {"id": int(tradeId)}, data, return_updated=True)[0]
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     return toObject(trade)
@@ -141,10 +147,9 @@ def Trade(app):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
 
-    trade = Database.update("Trade", {"id": int(tradeId)}, {'state': 3}, return_updated=True)
+    trade = Database.update("Trade", {"id": int(tradeId)}, {'state': 3}, return_updated=True)[0]
     # Socket
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
-
     return toObject(trade)
 
 
@@ -170,8 +175,8 @@ def Trade(app):
     decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
     # amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
     amountInvested = int(decrypted.split(':')[1])
-    if trade['state'] != 1:
-      return {'message': 'Trade is in state {}, requires state 1'.format(trade['state'])}
+    if trade['state'] != 2:
+      return {'message': 'Trade is in state {}, requires state 2'.format(trade['state'])}
 
     # First move the funds from the investors bank account to the brokers account
     moved = TL.move_funds(trade['brokerId'], trade['investorId'])
@@ -201,7 +206,7 @@ def Trade(app):
       numberTokens,
     )
 
-    Database.update("Trade", {"id": trade["id"]}, {"state": 2, "numberTokens": numberTokens})
+    Database.update("Trade", {"id": trade["id"]}, {"state": 5, "numberTokens": numberTokens})
     return {"message": "Tokens distributed"}
 
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])

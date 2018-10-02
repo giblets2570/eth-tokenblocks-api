@@ -51,7 +51,7 @@ def Truelayer(app):
       {"id": user["id"]},
       TL.get_access_token(user, code),
       return_updated = True
-    )
+    )[0]
     accounts = TL.get_accounts(user)
     if not len(accounts): raise NotFoundError('No accounts found for user')
 

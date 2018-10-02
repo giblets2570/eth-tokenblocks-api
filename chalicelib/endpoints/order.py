@@ -17,6 +17,13 @@ def Order(app):
     query = request.query_params or {}
     single = False
     orders = []
+    if 'page' in query:
+      page = int(query['page'])
+      del query['page']
+    if 'page_count' in query:
+      page_count = int(query['page_count'])
+      del query['page_count']
+
     if 'single' in query:
       del query['single']
       single = True
@@ -25,7 +32,6 @@ def Order(app):
       orders = [order]
     else:
       orders = Database.find("Order", query)
-
     for order in orders:
       order["broker"] = Database.find_one("User", {"id": order["brokerId"]}, ['id','name','email','address'])
       order["token"] = toObject(Database.find_one("Token", {"id": order["tokenId"]}))
@@ -39,7 +45,7 @@ def Order(app):
         orderTrade["trade"] = toObject(Database.find_one("Trade", {"id": orderTrade["tradeId"]}))
 
     if single: return toObject(orders[0])
-    return [toObject(t) for t in orders]
+    return toObject(orders)
 
   @app.route('/orders', cors=True, methods=['POST'])
   @loggedinMiddleware(app, 'broker')
@@ -70,7 +76,7 @@ def Order(app):
         "amount": amount,
         "cost": int(orderHolding["cost"]) if "cost" in orderHolding else 0
       }
-      orderHolding = Database.insert("OrderHolding", orderHolding)
+      orderHolding = Database.insert("OrderHolding", orderHolding, return_inserted=True)
 
     for trade in trades:
       Database.update("Trade", {"id": trade["id"]},{"sk": trade["sk"]})
@@ -78,7 +84,7 @@ def Order(app):
         "orderId": order["id"],
         "tradeId": trade["id"]
       }
-      orderTrade = Database.insert("OrderTrade", orderTrade)
+      orderTrade = Database.insert("OrderTrade", orderTrade, return_inserted=True)
 
     return toObject(order)
 
@@ -89,17 +95,23 @@ def Order(app):
     data = request.json_body
     order = Database.find_one("Order", {"hash": data["orderHash"]})
 
-    # set state to complete
+    # set order state to complete
     Database.update("Order", {"id": order["id"]}, {"state": 1})
 
+    # set state to all trade as verified
+    orderTrades = Database.find("OrderTrade", {"orderId": order["id"]})
+    tradesIds = [o['tradeId'] for o in orderTrades]
+    tradeQuery = [[('id','=',tradeId)] for tradeId in tradeIds]
+    Database.update("Trade", tradeQuery, {'state': 2})
+
     # Here I need to check if all orders are complete for the day
-    incompleteOrders = Database.find("Order", {"state": 0})
-    if len(incompleteOrders): 
+    executionDate = order["executionDate"]
+    incompleteOrders = Database.find("Order", {"state": 0, "executionDate": executionDate})
+    if len(incompleteOrders):
       # There are still orders waiting to complete
       print("There are still orders waiting to complete")
       return {"message": "Order completed"}
 
-    executionDate = order["executionDate"]
     # find the token
     token = Database.find_one("Token", {"id": order["tokenId"]})
     # Here I need to calculate the NAV of the fund
