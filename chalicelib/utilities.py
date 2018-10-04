@@ -31,6 +31,7 @@ def printError(func):
   return inner
 
 def toObject(model, keys=None):
+  if model == None: return None
   if type(model) == list:
     return [toObject(m, keys) for m in model]
   output = dict()

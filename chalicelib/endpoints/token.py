@@ -2,20 +2,21 @@ from chalicelib.database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
 from chalicelib.web3helper import Web3Helper
-import jwt, os, json
+from chalicelib.cryptor import Cryptor
 from chalicelib.utilities import *
+import jwt, os, json
 
 # Set the signature on the contract
 token_factory_contract = Web3Helper.getContract("TokenFactory.json")
 
 def Token(app):
+
   @app.route("/tokens", cors=True, methods=["POST"])
   @loggedinMiddleware(app, "admin")
   @printError
   def tokens_post():
     request = app.current_request
     data = request.json_body
-
     owner = None
     ownerId = data["ownerId"] if "ownerId" in data else None
     if not ownerId:
@@ -34,6 +35,9 @@ def Token(app):
       "fee": int(data["fee"]),
       "ownerId": ownerId
     }
+
+    token = Database.find_one("Token", token_data, insert=True)
+    
     try:
       tx = Web3Helper.transact(
         token_factory_contract,
@@ -45,17 +49,12 @@ def Token(app):
         token_data["fee"],
         Web3Helper.toChecksumAddress(owner['address']),
       )
-      print(tx)
+      print(tx.hex())
     except Exception as e:
-      # Token has already been put on blockchain
+      print("# Token has already been put on blockchain")
       print(e)
       pass
 
-    tokenAddress = Web3Helper.call(token_factory_contract,'tokenFromSymbol',token_data["symbol"],)
-    token_contract = Web3Helper.getContract("ETT.json", address=tokenAddress)
-    tokenOwner = Web3Helper.call(token_contract,'owner',)
-    token_data['address'] = Web3Helper.toChecksumAddress(tokenAddress)
-    token = Database.find_one("Token", token_data, insert=True)
     return toObject(token)
 
   @app.route("/tokens", cors=True, methods=["GET"])
@@ -81,12 +80,12 @@ def Token(app):
     return toObject(token)
 
   @app.route("/tokens/{tokenId}/balance", cors=True, methods=["GET"])
-  @loggedinMiddleware(app, "investor")
+  @loggedinMiddleware(app)
   @printError
   def token_get_balance(tokenId):
     request = app.current_request
-    print({"tokenId": int(tokenId), "investorId": request.user["id"]})
-    tokenBalance = Database.find_one("TokenBalance", {"tokenId": int(tokenId), "investorId": request.user["id"]}, insert=True)
+    print({"tokenId": int(tokenId), "userId": request.user["id"]})
+    tokenBalance = Database.find_one("TokenBalance", {"tokenId": int(tokenId), "userId": request.user["id"]}, insert=True)
     return toObject(tokenBalance)
 
   @app.route("/tokens/{tokenId}/balances", cors=True, methods=["GET"])
@@ -97,7 +96,7 @@ def Token(app):
     if not token: raise NotFoundError("token not found with id {}".format(tokenId))
     token_balances = Database.find("TokenBalance", {"tokenId": token["id"]})
     for token_balance in token_balances:
-      investor = Database.find_one("User", {"id": token_balance["investorId"]}, ["id", "name", "address"])
+      investor = Database.find_one("User", {"id": token_balance["userId"]}, ["id", "name", "address"])
       token_balance["investor"] = investor
     return toObject(token_balances)
 
@@ -136,5 +135,53 @@ def Token(app):
         "tokenHoldingsId": tokenHoldings["id"]
       }, insert=True)
 
-
     return toObject(tokenHoldings)
+
+
+  @app.route("/tokens/{tokenId}/nav", cors=True, methods=["GET"])
+  @printError
+  def token_current_nav(tokenId):
+    request = app.current_request
+    data = request.json_body
+    token = Database.find_one("Token", {"id": int(tokenId)})
+    if not token: raise NotFoundError("token not found with id {}".format(tokenId))
+
+    # Need to figure out if this gets the most recent
+    navTimestamp = Database.find_one("NavTimestamp",{"tokenId": token['id']})
+
+    return toObject(navTimestamp)
+
+  @app.route("/tokens/{tokenId}/invested", cors=True, methods=["GET"])
+  @loggedinMiddleware(app)
+  @printError
+  def token_invested(tokenId):
+    request = app.current_request
+    data = request.json_body
+    token = Database.find_one("Token", {"id": int(tokenId)})
+    if not token: raise NotFoundError("token not found with id {}".format(tokenId))
+
+    # Need to find all the trades this investor invested in
+    claimedTrades = Database.find("Trade", {"tokenId": token["id"], "investorId": request.user["id"], "state": 5})
+
+    totalAmount = 0
+    for trade in claimedTrades:
+      decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
+      # I'll need to include the currency here
+      amountInvested = int(decrypted.split(':')[1])
+      print(amountInvested)
+      totalAmount += amountInvested
+
+    return toObject({"totalAmount": totalAmount})
+
+
+  @app.route("/tokens/update/contract", cors=True, methods=["PUT"])
+  @printError
+  def tokens_update_contract():
+    request = app.current_request
+    data = request.json_body
+    Database.update("Token", {"symbol": data["symbol"]},{
+      "address": Web3Helper.toChecksumAddress(data["tokenAddress"]),
+    })
+    token = Database.find_one("Token",{"symbol": data["symbol"]})
+    print(token)
+    return toObject(token)

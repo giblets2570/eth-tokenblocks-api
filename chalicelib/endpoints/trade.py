@@ -173,7 +173,7 @@ def Trade(app):
   def trades_claim(tradeId):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
-    # amountInvested = trade['sk'] * trade['nominalAmount'] # This is decryption placeholder
+    # Ill need to include the currency here
     amountInvested = int(decrypted.split(':')[1])
     if trade['state'] != 2:
       return {'message': 'Trade is in state {}, requires state 2'.format(trade['state'])}

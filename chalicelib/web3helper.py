@@ -19,14 +19,13 @@ class Web3Helper():
 
 	@classmethod
 	def transact(cls,contract,_method,*args):
+		print("Price ",w3.eth.generateGasPrice())
 		method = getattr(contract.functions,_method)
-		return method(*args).transact({'from': account})
+		# return method(*args).transact({'from': account})
 		tx = method(*args).buildTransaction({
 			"from": account,
 			"nonce": w3.eth.getTransactionCount(account),
-			# "gas": 8000029,
-   #      	"gasPrice": 20000000000,
-			"chainId": 1,
+			"gasPrice": 91000000000
 		})
 		signedTx = w3.eth.account.signTransaction(tx, private_key=privateKey)
 		return w3.eth.sendRawTransaction(signedTx.rawTransaction)

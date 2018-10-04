@@ -45,7 +45,7 @@ def Truelayer(app):
     code = request.query_params['code']
     nonce = request.query_params['state']
     user =  Database.find_one("User", {'nonce': nonce})
-    if not user: raise NotFoundError('user not found with id {}'.format(user_id))
+    if not user: raise NotFoundError('user not found')
     user = Database.update(
       'User',
       {"id": user["id"]},
