@@ -70,7 +70,8 @@ CREATE TABLE SecurityTimestamp (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     securityId INT UNSIGNED,
     price INT UNSIGNED,
-    state INT UNSIGNED, 
+    state INT UNSIGNED,
+    executionDate DATE,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (securityId) REFERENCES Security(id)
 );  
@@ -115,7 +116,7 @@ CREATE TABLE Trade (
     executionDate DATE,
     expirationTimestampInSec BIGINT UNSIGNED,
     salt INT UNSIGNED,
-    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel, 5 == claimed
+    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel, 5 == created, 6 == claimed
     signature VARCHAR(300),
     hash VARCHAR(200),
     sk VARCHAR(200),

@@ -1,4 +1,4 @@
-import arrow, math
+import arrow, math, random
 from chalicelib.database import Database
 from datetime import datetime
 from chalice import NotFoundError, ForbiddenError
@@ -17,6 +17,8 @@ def Order(app):
     query = request.query_params or {}
     single = False
     orders = []
+    total = None
+
     if 'page' in query:
       page = int(query['page'])
       del query['page']
@@ -31,7 +33,11 @@ def Order(app):
       if not order: raise NotFoundError("No order found")
       orders = [order]
     else:
-      orders = Database.find("Order", query)
+      dbRes = Database.find("Order", query, page=page, page_count=page_count)
+      orders = dbRes['data']
+      total = dbRes['total']
+
+
     for order in orders:
       order["broker"] = Database.find_one("User", {"id": order["brokerId"]}, ['id','name','email','address'])
       order["token"] = toObject(Database.find_one("Token", {"id": order["tokenId"]}))
@@ -44,8 +50,10 @@ def Order(app):
       for orderTrade in order["orderTrades"]:
         orderTrade["trade"] = toObject(Database.find_one("Trade", {"id": orderTrade["tradeId"]}))
 
-    if single: return toObject(orders[0])
-    return toObject(orders)
+    if single: 
+      return toObject(orders[0])
+
+    return {"data": toObject(orders), "total": total}
 
   @app.route('/orders', cors=True, methods=['POST'])
   @loggedinMiddleware(app, 'broker')
@@ -100,48 +108,42 @@ def Order(app):
 
     # set state to all trade as verified
     orderTrades = Database.find("OrderTrade", {"orderId": order["id"]})
-    tradesIds = [o['tradeId'] for o in orderTrades]
+    tradeIds = [o['tradeId'] for o in orderTrades]
     tradeQuery = [[('id','=',tradeId)] for tradeId in tradeIds]
     Database.update("Trade", tradeQuery, {'state': 2})
 
     # Here I need to check if all orders are complete for the day
     executionDate = order["executionDate"]
-    incompleteOrders = Database.find("Order", {"state": 0, "executionDate": executionDate})
+    incompleteOrders = Database.find("Order", {"state": 0, "executionDate": executionDate, "tokenId": order["tokenId"]})
     if len(incompleteOrders):
       # There are still orders waiting to complete
       print("There are still orders waiting to complete")
       return {"message": "Order completed"}
 
+    # Here I need to calculate the AUM
     # find the token
     token = Database.find_one("Token", {"id": order["tokenId"]})
-    # Here I need to calculate the NAV of the fund
-    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": executionDate, "tokenId": order["tokenId"]})
+    tokenContract = Web3Helper.getContract("ETT.json", token['address'])
 
-    # if nav already calculated today
-    if navTimestamp: 
-      print("Already calculated")
-      return {"message": "Already calculated"}
+    tokenHoldingsObject = Database.find_one("TokenHoldings", {"tokenId": token["id"]})
+    tokenHoldings = Database.find("TokenHolding", {"tokenHoldingsId": tokenHoldingsObject["id"]})
 
-    # get yesterdays nav and totalSupply
-    yesterdaysExecutionDate = arrow.get(executionDate).shift(days=-1).format('YYYY-MM-DD')
-    yesterdaysNavTimestamp = Database.find_one('NavTimestamp', {"executionDate": yesterdaysExecutionDate, "tokenId": order["tokenId"]}, insert=True)
-    yesterdaysValue = yesterdaysNavTimestamp['value']
-
-    ######################################################
-    # lets just set this to £1,000,000 for now
-    ######################################################
-    valueWithoutHoldingsUpdate = 100000000
-    valueOfNewHoldings = 25000
-    newNav = valueWithoutHoldingsUpdate + valueOfNewHoldings
-    Database.insert('NavTimestamp', {"executionDate": executionDate, "tokenId": order["tokenId"], "value": newNav})
-
-    # create the new tokens
+    newAUM = 0
+    for tokenHolding in tokenHoldings:
+      securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='createdAt')
+      if not securityTimestamp:
+        pass
+        # Just give it a random value for now
+        # securityTimestamp = Database.find_one("SecurityTimestamp", {
+        #   "securityId": tokenHolding["securityId"], 
+        #   "executionDate": executionDate, 
+        #   "price": random.randint(0, 10)
+        # },
+        # insert=True)
+      newAUM += securityTimestamp['price'] * tokenHolding['securityAmount']
+    
     executionDateString = arrow.get(executionDate).format('YYYY-MM-DD')
-    token_contract = Web3Helper.getContract("ETT.json", token['address'])
-    totalSupply = Web3Helper.call(token_contract,'totalSupply',)
-    tokensSupplyChange = math.floor(totalSupply * valueOfNewHoldings / valueWithoutHoldingsUpdate)
-    tx = Web3Helper.transact(token_contract, 'updateTotalSupply', tokensSupplyChange, executionDateString)
-    tx = Web3Helper.transact(token_contract, 'updateNAV', newNav, executionDateString)
-
-    print("Order completed and created new tokens")
-    return {"message": "Order completed and created new tokens"}
+    tx = Web3Helper.transact(tokenContract, 'updateAUM', newAUM, executionDateString)
+    # tx = b''
+    print({"message": "AUM updated", "AUM": newAUM, "hash": tx.hex()})
+    return {"message": "AUM updated", "AUM": newAUM, "hash": tx.hex()}

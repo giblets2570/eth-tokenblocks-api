@@ -11,6 +11,8 @@ if privateKey:
 else:
 	account = w3.eth.accounts[0]
 
+debug = False
+
 class Web3Helper():
 	@classmethod
 	def call(cls,contract,_method,*args):
@@ -22,13 +24,19 @@ class Web3Helper():
 		print("Price ",w3.eth.generateGasPrice())
 		method = getattr(contract.functions,_method)
 		# return method(*args).transact({'from': account})
-		tx = method(*args).buildTransaction({
-			"from": account,
-			"nonce": w3.eth.getTransactionCount(account),
-			"gasPrice": 91000000000
-		})
-		signedTx = w3.eth.account.signTransaction(tx, private_key=privateKey)
-		return w3.eth.sendRawTransaction(signedTx.rawTransaction)
+		try: 
+			tx = method(*args).buildTransaction({
+				"from": account,
+				"nonce": w3.eth.getTransactionCount(account),
+				"gasPrice": 91000000000
+			})
+			signedTx = w3.eth.account.signTransaction(tx, private_key=privateKey)
+			return w3.eth.sendRawTransaction(signedTx.rawTransaction)
+		except Exception as e:
+			if debug: print(e)
+			else: print("Transaction failed")
+			return b''
+			
 
 	@classmethod
 	def account(cls):

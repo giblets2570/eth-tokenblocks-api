@@ -34,7 +34,13 @@ class Database(object):
 
   @classmethod
   def data_to_query(cls, data):
-    query = [(key,'=',data[key]) for key in data.keys()]
+    query = []
+    for key in data.keys():
+      operator = '='
+      if type(data[key]) == tuple:
+        operator = data[key][0]
+        data[key] = data[key][1]
+      query.append((key,operator,data[key]))
     return query
 
   @classmethod
@@ -68,8 +74,6 @@ class Database(object):
       connection.commit()
     connection.close()
     if return_inserted: return cls.find_one(table_name, data)
-
-
 
   @classmethod
   def find_one(cls, table_name, query=[], return_filter = ['*'], insert = False, order_by=None):

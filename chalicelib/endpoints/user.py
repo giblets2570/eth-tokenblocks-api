@@ -66,6 +66,8 @@ def User(app):
     data = request.json_body
     token = Database.find_one("Token", {"address": data["token"]})
     if not token: raise NotFoundError('token not found with address {}'.format(data["token"]))
+    Database.update("Token", {"id": token["id"]}, {"totalSupply": data["newTotalSupply"]})
+
     user = Database.find_one("User", {'address': data["owner"]})
     if not user: raise NotFoundError('user not found with address {}'.format(data["owner"]))
     userBalance = Database.find_one("TokenBalance", {'userId': user['id'], "tokenId": token["id"]}, insert=True)
@@ -94,6 +96,24 @@ def User(app):
     toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)[0]
 
     return {"message": "Funds transferred"}
+
+  @app.route('/users/balance/fee-taken', cors=True, methods=['PUT'])
+  @printError
+  def feeTaken():
+    request = app.current_request
+    data = request.json_body
+    print(data)
+    token = Database.find_one("Token", {"address": data["token"]})
+    ownerUser = Database.find_one("User", {'address': data["owner"]})
+    if not ownerUser: raise NotFoundError('user not found with address {}'.format(data["owner"]))
+
+    value = data['value']
+
+    ownerBalance = Database.find_one("TokenBalance", {'userId': ownerUser['id'], "tokenId": token["id"]}, insert=True)
+    newOwnerBalance = ownerBalance['balance'] + value
+    ownerBalance = Database.update("TokenBalance", {"id": ownerBalance["id"]}, {"balance": newOwnerBalance}, return_updated=True)[0]
+
+    return {"message": "Fee taken"}
 
 
   @app.route('/accounts/{address}/check-kyc')

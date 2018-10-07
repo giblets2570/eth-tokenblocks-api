@@ -14,6 +14,7 @@ tradeKernelContract = Web3Helper.getContract("TradeKernel.json")
 
 def Trade(app):
   @app.route("/trades", cors=True, methods=["POST"])
+  @loggedinMiddleware(app)
   @printError
   def trades_post():
 
@@ -56,7 +57,9 @@ def Trade(app):
     trades = []
     tradeBrokers = []
     query = request.query_params or {}
-    if 'state' in query: query['state'] = int(query['state'])
+    if 'state' in query: 
+      query['state'] = int(query['state'])
+
     page = 0
     page_count = None
     total = None
@@ -67,6 +70,10 @@ def Trade(app):
     if 'page_count' in query:
       page_count = int(query['page_count'])
       del query['page_count']
+
+    if 'confirmed' in query:
+      query['state'] = ('>=', 1)
+      del query['confirmed']
 
     if request.user["role"] == "investor":
       query["investorId"] = request.user["id"]
@@ -174,7 +181,7 @@ def Trade(app):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
     # Ill need to include the currency here
-    amountInvested = int(decrypted.split(':')[1])
+    amountInvested = int(float(decrypted.split(':')[1])*100)
     if trade['state'] != 2:
       return {'message': 'Trade is in state {}, requires state 2'.format(trade['state'])}
 
@@ -201,8 +208,8 @@ def Trade(app):
       tradeKernelContract,
       'distributeTokens',
       trade['hash'], 
-      investor['address'], 
-      token['address'], 
+      Web3Helper.toChecksumAddress(investor['address']), 
+      Web3Helper.toChecksumAddress(token['address']), 
       numberTokens,
     )
 
