@@ -4,7 +4,7 @@ from chalice import NotFoundError, ForbiddenError
 from chalicelib.web3helper import Web3Helper
 from chalicelib.cryptor import Cryptor
 from chalicelib.utilities import *
-import jwt, os, json, arrow
+import jwt, os, json, arrow, math
 
 # Set the signature on the contract
 token_factory_contract = Web3Helper.getContract("TokenFactory.json")
@@ -34,7 +34,7 @@ def Token(app):
       "cutoffTime": int(data["cutoffTime"]),
       "fee": int(data["fee"]),
       "ownerId": ownerId,
-      "totalSupply": int(data["initialAmount"])
+      "totalSupply": data["initialAmount"]
     }
 
     token = Database.find_one("Token", token_data, insert=True)
@@ -211,6 +211,7 @@ def Token(app):
       supplyUpdate,
       executionDate
     )
+    # tx = b''
     print(tx.hex())
 
     return toObject(token)

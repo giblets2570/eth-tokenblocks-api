@@ -66,12 +66,14 @@ def User(app):
     data = request.json_body
     token = Database.find_one("Token", {"address": data["token"]})
     if not token: raise NotFoundError('token not found with address {}'.format(data["token"]))
+    print(data)
     Database.update("Token", {"id": token["id"]}, {"totalSupply": data["newTotalSupply"]})
 
     user = Database.find_one("User", {'address': data["owner"]})
     if not user: raise NotFoundError('user not found with address {}'.format(data["owner"]))
     userBalance = Database.find_one("TokenBalance", {'userId': user['id'], "tokenId": token["id"]}, insert=True)
-    newBalance = userBalance['balance'] + data["newTotalSupply"] - data["oldTotalSupply"]
+    if 'balance' not in userBalance: userBalance['balance'] = '0'
+    newBalance = int(userBalance['balance']) + data["newTotalSupply"] - data["oldTotalSupply"]
     userBalance = Database.update("TokenBalance", {"id": userBalance["id"]}, {"balance": newBalance}, return_updated=True)[0]
     return toObject(userBalance)
 
@@ -88,11 +90,13 @@ def User(app):
     value = data['value']
 
     fromBalance = Database.find_one("TokenBalance", {'userId': fromUser['id'], "tokenId": token["id"]}, insert=True)
-    newFromBalance = fromBalance['balance'] - value
+    if 'balance' not in fromBalance: fromBalance['balance'] = '0'
+    newFromBalance = int(fromBalance['balance']) - value
     fromBalance = Database.update("TokenBalance", {"id": fromBalance["id"]}, {"balance": newFromBalance}, return_updated=True)[0]
 
     toBalance = Database.find_one("TokenBalance", {'userId': toUser['id'], "tokenId": token["id"]}, insert=True)
-    newToBalance = toBalance['balance'] - value
+    if 'balance' not in toBalance: toBalance['balance'] = '0'
+    newToBalance = int(toBalance['balance']) - value
     toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)[0]
 
     return {"message": "Funds transferred"}
@@ -102,7 +106,9 @@ def User(app):
   def feeTaken():
     request = app.current_request
     data = request.json_body
-    print(data)
+    print(data) 
+
+    # return {"testing": "testing"}
     token = Database.find_one("Token", {"address": data["token"]})
     ownerUser = Database.find_one("User", {'address': data["owner"]})
     if not ownerUser: raise NotFoundError('user not found with address {}'.format(data["owner"]))
@@ -110,6 +116,7 @@ def User(app):
     value = data['value']
 
     ownerBalance = Database.find_one("TokenBalance", {'userId': ownerUser['id'], "tokenId": token["id"]}, insert=True)
+    if 'balance' not in ownerBalance: ownerBalance['balance'] = '0'
     newOwnerBalance = ownerBalance['balance'] + value
     ownerBalance = Database.update("TokenBalance", {"id": ownerBalance["id"]}, {"balance": newOwnerBalance}, return_updated=True)[0]
 

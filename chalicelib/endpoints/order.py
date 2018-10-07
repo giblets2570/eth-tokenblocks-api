@@ -142,6 +142,7 @@ def Order(app):
         # insert=True)
       newAUM += securityTimestamp['price'] * tokenHolding['securityAmount']
     
+    print(float(token['totalSupply'])/100, newAUM)
     executionDateString = arrow.get(executionDate).format('YYYY-MM-DD')
     tx = Web3Helper.transact(tokenContract, 'updateAUM', newAUM, executionDateString)
     # tx = b''

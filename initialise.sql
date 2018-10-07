@@ -41,19 +41,10 @@ CREATE TABLE Token (
     fee INT UNSIGNED,
     ownerId INT UNSIGNED,
     decimals SMALLINT UNSIGNED,
-    totalSupply INT UNSIGNED,
+    totalSupply TEXT,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ownerId) REFERENCES User(id)
 );
-
-CREATE TABLE NavTimestamp (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    tokenId INT UNSIGNED,
-    value INT UNSIGNED,
-    executionDate DATE, 
-    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tokenId) REFERENCES Token(id)
-);  
 
 CREATE TABLE Security (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -80,7 +71,7 @@ CREATE TABLE TokenBalance (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     tokenId INT UNSIGNED,
     userId INT UNSIGNED,
-    balance BIGINT UNSIGNED DEFAULT 0,
+    balance TEXT,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tokenId) REFERENCES Token(id),
     FOREIGN KEY (userId) REFERENCES User(id)
