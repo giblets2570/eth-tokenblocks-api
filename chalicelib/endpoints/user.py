@@ -73,7 +73,8 @@ def User(app):
     if not user: raise NotFoundError('user not found with address {}'.format(data["owner"]))
     userBalance = Database.find_one("TokenBalance", {'userId': user['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in userBalance: userBalance['balance'] = '0'
-    newBalance = int(userBalance['balance']) + data["newTotalSupply"] - data["oldTotalSupply"]
+    if not userBalance['balance']: userBalance['balance'] = '0'
+    newBalance = float(userBalance['balance']) + data["newTotalSupply"] - data["oldTotalSupply"]
     userBalance = Database.update("TokenBalance", {"id": userBalance["id"]}, {"balance": newBalance}, return_updated=True)[0]
     return toObject(userBalance)
 
@@ -91,12 +92,14 @@ def User(app):
 
     fromBalance = Database.find_one("TokenBalance", {'userId': fromUser['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in fromBalance: fromBalance['balance'] = '0'
-    newFromBalance = int(fromBalance['balance']) - value
+    if not fromBalance['balance']: fromBalance['balance'] = '0'
+    newFromBalance = float(fromBalance['balance']) - value
     fromBalance = Database.update("TokenBalance", {"id": fromBalance["id"]}, {"balance": newFromBalance}, return_updated=True)[0]
 
     toBalance = Database.find_one("TokenBalance", {'userId': toUser['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in toBalance: toBalance['balance'] = '0'
-    newToBalance = int(toBalance['balance']) - value
+    if not toBalance['balance']: toBalance['balance'] = '0'
+    newToBalance = float(toBalance['balance']) - value
     toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)[0]
 
     return {"message": "Funds transferred"}
@@ -117,7 +120,8 @@ def User(app):
 
     ownerBalance = Database.find_one("TokenBalance", {'userId': ownerUser['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in ownerBalance: ownerBalance['balance'] = '0'
-    newOwnerBalance = ownerBalance['balance'] + value
+    if not ownerBalance['balance']: ownerBalance['balance'] = '0'
+    newOwnerBalance = float(ownerBalance['balance']) + value
     ownerBalance = Database.update("TokenBalance", {"id": ownerBalance["id"]}, {"balance": newOwnerBalance}, return_updated=True)[0]
 
     return {"message": "Fee taken"}

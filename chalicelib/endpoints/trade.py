@@ -1,4 +1,4 @@
-import jwt, os, json, requests, math, arrow
+import jwt, os, json, requests, math, arrow, copy
 from chalicelib.database import Database
 from chalicelib.truelayer import Truelayer as TL
 from datetime import datetime, date
@@ -72,7 +72,7 @@ def Trade(app):
       del query['page_count']
 
     if 'confirmed' in query:
-      query['state'] = ('>=', 1)
+      query['state'] = ('>', 0)
       del query['confirmed']
 
     if request.user["role"] == "investor":
@@ -82,17 +82,20 @@ def Trade(app):
       total = dbRes['total']
 
     elif request.user["role"] == "broker":
-      dbRes = Database.find("TradeBroker", {"brokerId": request.user["id"]}, page=page, page_count=page_count)
+      dbRes = Database.find("TradeBroker", {"brokerId": request.user["id"]}, page=0, page_count=500000000000)
       tradeBrokers = dbRes['data']
       total = dbRes["total"]
       tradeIds = [tradeBroker["tradeId"] for tradeBroker in tradeBrokers]
       for i, tradeId in enumerate(tradeIds):
-        query["id"] = tradeId
-        trade = Database.find_one("Trade", query)
+        _query = copy.copy(query)
+        _query["id"] = tradeId
+        trade = Database.find_one("Trade", _query)
         if trade:
           if trade["brokerId"] and trade["brokerId"] != request.user["id"]: continue          
           trade["tradeBrokers"] = [tradeBrokers[i]]
           trades += [trade]
+      if page_count:
+        trades = trades[page*page_count: (page+1)*page_count]
 
     tokenIds = list(set([o["tokenId"] for o in trades]))
     tokens = [Database.find_one("Token", {"id": t}) for t in tokenIds]
@@ -181,9 +184,9 @@ def Trade(app):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
     # Ill need to include the currency here
-    amountInvested = int(float(decrypted.split(':')[1])*100)
-    if trade['state'] != 2:
-      return {'message': 'Trade is in state {}, requires state 2'.format(trade['state'])}
+    amountInvested = int(decrypted.split(':')[1])
+    if trade['state'] != 5:
+      return {'message': 'Trade is in state {}, requires state 5'.format(trade['state'])}
 
     # First move the funds from the investors bank account to the brokers account
     moved = TL.move_funds(trade['brokerId'], trade['investorId'])
@@ -213,7 +216,7 @@ def Trade(app):
       numberTokens,
     )
 
-    Database.update("Trade", {"id": trade["id"]}, {"state": 5, "numberTokens": numberTokens})
+    Database.update("Trade", {"id": trade["id"]}, {"state": 6, "numberTokens": numberTokens})
     return {"message": "Tokens distributed"}
 
   @app.route("/trades/confirmed", cors=True, methods=["PUT"])

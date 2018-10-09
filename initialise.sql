@@ -137,7 +137,7 @@ CREATE TABLE `Order` (
     tokenId INT UNSIGNED,
     signature VARCHAR(300),
     amount INT,
-    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == complete
+    state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == verified, 2 == completed
     executionDate DATE,
     salt INT UNSIGNED,
     hash VARCHAR(200),

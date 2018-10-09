@@ -130,21 +130,12 @@ def Order(app):
 
     newAUM = 0
     for tokenHolding in tokenHoldings:
-      securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='createdAt')
-      if not securityTimestamp:
-        pass
-        # Just give it a random value for now
-        # securityTimestamp = Database.find_one("SecurityTimestamp", {
-        #   "securityId": tokenHolding["securityId"], 
-        #   "executionDate": executionDate, 
-        #   "price": random.randint(0, 10)
-        # },
-        # insert=True)
+      securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='-createdAt')
       newAUM += securityTimestamp['price'] * tokenHolding['securityAmount']
     
-    print(float(token['totalSupply'])/100, newAUM)
     executionDateString = arrow.get(executionDate).format('YYYY-MM-DD')
-    tx = Web3Helper.transact(tokenContract, 'updateAUM', newAUM, executionDateString)
+
+    tx = Web3Helper.transact(tokenContract, 'endOfDay', executionDateString)
     # tx = b''
     print({"message": "AUM updated", "AUM": newAUM, "hash": tx.hex()})
     return {"message": "AUM updated", "AUM": newAUM, "hash": tx.hex()}

@@ -11,7 +11,7 @@ if privateKey:
 else:
 	account = w3.eth.accounts[0]
 
-debug = False
+debug = True
 
 class Web3Helper():
 	@classmethod
