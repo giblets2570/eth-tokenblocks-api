@@ -74,7 +74,7 @@ def User(app):
     userBalance = Database.find_one("TokenBalance", {'userId': user['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in userBalance: userBalance['balance'] = '0'
     if not userBalance['balance']: userBalance['balance'] = '0'
-    newBalance = float(userBalance['balance']) + data["newTotalSupply"] - data["oldTotalSupply"]
+    newBalance = int(float(userBalance['balance'])) + int(float(data["newTotalSupply"])) - int(float(data["oldTotalSupply"]))
     userBalance = Database.update("TokenBalance", {"id": userBalance["id"]}, {"balance": newBalance}, return_updated=True)[0]
     return toObject(userBalance)
 
@@ -83,6 +83,9 @@ def User(app):
   def balanceTransfer():
     request = app.current_request
     data = request.json_body
+    print("\n\nbalanceTransfer\n\n")
+    print(data)
+    print("\n\nbalanceTransfer\n\n")
     token = Database.find_one("Token", {"address": data["token"]})
     fromUser = Database.find_one("User", {'address': data["from"]})
     if not fromUser: raise NotFoundError('user not found with address {}'.format(data["from"]))
@@ -93,13 +96,13 @@ def User(app):
     fromBalance = Database.find_one("TokenBalance", {'userId': fromUser['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in fromBalance: fromBalance['balance'] = '0'
     if not fromBalance['balance']: fromBalance['balance'] = '0'
-    newFromBalance = float(fromBalance['balance']) - value
+    newFromBalance = int(float(fromBalance['balance'])) - int(float(value))
     fromBalance = Database.update("TokenBalance", {"id": fromBalance["id"]}, {"balance": newFromBalance}, return_updated=True)[0]
 
     toBalance = Database.find_one("TokenBalance", {'userId': toUser['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in toBalance: toBalance['balance'] = '0'
     if not toBalance['balance']: toBalance['balance'] = '0'
-    newToBalance = float(toBalance['balance']) - value
+    newToBalance = int(float(toBalance['balance'])) + int(float(value))
     toBalance = Database.update("TokenBalance", {"id": toBalance["id"]}, {"balance": newToBalance}, return_updated=True)[0]
 
     return {"message": "Funds transferred"}
@@ -121,7 +124,7 @@ def User(app):
     ownerBalance = Database.find_one("TokenBalance", {'userId': ownerUser['id'], "tokenId": token["id"]}, insert=True)
     if 'balance' not in ownerBalance: ownerBalance['balance'] = '0'
     if not ownerBalance['balance']: ownerBalance['balance'] = '0'
-    newOwnerBalance = float(ownerBalance['balance']) + value
+    newOwnerBalance = int(float(ownerBalance['balance'])) + int(float(value))
     ownerBalance = Database.update("TokenBalance", {"id": ownerBalance["id"]}, {"balance": newOwnerBalance}, return_updated=True)[0]
 
     return {"message": "Fee taken"}

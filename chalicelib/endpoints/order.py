@@ -123,6 +123,7 @@ def Order(app):
     # Here I need to calculate the AUM
     # find the token
     token = Database.find_one("Token", {"id": order["tokenId"]})
+    print(token['address'])
     tokenContract = Web3Helper.getContract("ETT.json", token['address'])
 
     tokenHoldingsObject = Database.find_one("TokenHoldings", {"tokenId": token["id"]})

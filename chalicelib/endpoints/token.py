@@ -177,7 +177,7 @@ def Token(app):
     if not token: raise NotFoundError("token not found with id {}".format(tokenId))
 
     # Need to find all the trades this investor invested in
-    claimedTrades = Database.find("Trade", {"tokenId": token["id"], "investorId": request.user["id"], "state": 5})
+    claimedTrades = Database.find("Trade", {"tokenId": token["id"], "investorId": request.user["id"], "state": 6})
 
     totalAmount = 0
     for trade in claimedTrades:
@@ -210,7 +210,7 @@ def Token(app):
   def tokens_contract_end_of_day():
     request = app.current_request
     data = request.json_body
-    totalSupply = data["totalSupply"]
+    totalSupply = int(float(data["totalSupply"]))
     time = data["time"]
     executionDate = arrow.get(time).format('YYYY-MM-DD')
 
@@ -305,8 +305,7 @@ def Token(app):
 
 
     # Update trades to be ready for claiming
-    tradeIds = [o['tradeId'] for o in allOrderTrades]
-    tradeQuery = [[('id','=',tradeId)] for tradeId in tradeIds]
+    tradeQuery = [[('id','=',t['id'])] for t in allOrderTrades]
     Database.update("Trade", tradeQuery, {'state': 5})
 
     tx = Web3Helper.transact(

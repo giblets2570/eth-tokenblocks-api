@@ -45,7 +45,7 @@ def Trade(app):
       Database.insert("TradeBroker", tradeBrokerData)
       tradeBroker = Database.find_one("TradeBroker", tradeBrokerData)
 
-    # Socket
+    # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-created", data=data)
     return toObject(trade)
 
@@ -144,7 +144,7 @@ def Trade(app):
     if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
 
     trade = Database.update("Trade", {"id": int(tradeId)}, data, return_updated=True)[0]
-    # Socket
+    # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     return toObject(trade)
 
@@ -158,7 +158,7 @@ def Trade(app):
     if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
 
     trade = Database.update("Trade", {"id": int(tradeId)}, {'state': 3}, return_updated=True)[0]
-    # Socket
+    # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     return toObject(trade)
 
@@ -174,7 +174,7 @@ def Trade(app):
     tradeBroker = Database.find_one("TradeBroker", {"tradeId": trade["id"], "brokerId": request.user["id"]})
     if not tradeBroker: raise NotFoundError("tradeBroker not found with trade id {}".format(tradeId))
     Database.update("TradeBroker", {"id": tradeBroker["id"]}, {"price": data["price"]})
-    # Socket
+    # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     return toObject(trade)
 
@@ -183,6 +183,8 @@ def Trade(app):
   def trades_claim(tradeId):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
+    price = Cryptor.decryptInput(trade['price'], trade['sk'])
+
     # Ill need to include the currency here
     amountInvested = int(decrypted.split(':')[1])
     if trade['state'] != 5:
@@ -197,25 +199,52 @@ def Trade(app):
     
     # get todays nav and totalSupply
     token = Database.find_one('Token', {'id': trade['tokenId']})
-    navTimestamp = Database.find_one('NavTimestamp', {"executionDate": trade['executionDate'], "tokenId": trade["tokenId"]})
+
+    tokenHoldings = Database.find_one("TokenHoldings",{"tokenId": token["id"]}, order_by='-createdAt')
+    allTokenHoldings = Database.find("TokenHolding",{"tokenHoldingsId": tokenHoldings["id"]})
+
+    AUM = 0
+    for holding in allTokenHoldings:
+      securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': holding["securityId"]}, order_by='-createdAt')
+      AUM += securityTimestamp['price'] * holding['securityAmount']
+
+    NAV = AUM / float(token['totalSupply'])
+
+    effectiveNAV = (1+float(price)/10000)*NAV
+
+    totalTokens = int(amountInvested / NAV)
+    investorTokens = int(amountInvested / effectiveNAV)
+    brokerTokens = totalTokens - investorTokens
+
+    print(NAV, effectiveNAV, price)
+    print(AUM, amountInvested)
+    print(totalTokens, investorTokens, brokerTokens)
+
     tokenContract = Web3Helper.getContract("ETT.json", token['address'])
     totalSupply = Web3Helper.call(tokenContract,'dateTotalSupply',arrow.get(trade['executionDate']).format('YYYY-MM-DD'),)
 
     # find number of tokens user allocated
-    numberTokens = 0 if not navTimestamp['value'] else math.floor(amountInvested * totalSupply / navTimestamp['value'])
+    numberTokens = 0 if not NAV else math.floor(amountInvested * totalSupply / NAV)
 
     # now ask the contract to distribute the tokens (maybe should be the investor that does this)
     investor = Database.find_one("User", {"id": trade["investorId"]})
+    broker = Database.find_one("User", {"id": trade["brokerId"]})
     tradeKernelContract = Web3Helper.getContract("TradeKernel.json")
-    Web3Helper.transact(
+    tx = Web3Helper.transact(
       tradeKernelContract,
       'distributeTokens',
-      trade['hash'], 
-      Web3Helper.toChecksumAddress(investor['address']), 
-      Web3Helper.toChecksumAddress(token['address']), 
-      numberTokens,
+      trade['hash'],
+      [
+        Web3Helper.toChecksumAddress(token['address']), 
+        Web3Helper.toChecksumAddress(investor['address']),
+        Web3Helper.toChecksumAddress(broker['address'])
+      ],
+      [
+        investorTokens,
+        brokerTokens
+      ]
     )
-
+    print(tx.hex())
     Database.update("Trade", {"id": trade["id"]}, {"state": 6, "numberTokens": numberTokens})
     return {"message": "Tokens distributed"}
 
@@ -232,7 +261,7 @@ def Trade(app):
     Database.update("Trade", {"id": trade["id"]}, {"state": 1})
     Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": 1})
 
-    # Socket
+    # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = 1
     return toObject(trade)
@@ -251,7 +280,7 @@ def Trade(app):
     Database.update("Trade", {"id": trade["id"]}, {"state": state})
     Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": state})
 
-    # Socket
+    # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = state
     return toObject(trade) 
