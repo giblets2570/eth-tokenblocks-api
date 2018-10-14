@@ -4,6 +4,8 @@ import binascii
 from Crypto import Random
 from Crypto.Cipher import AES
 
+env = os.environ.get('ENV', None)
+
 # ------------------------------
 # DEFINE Encryption Class
 class Cryptor(object):
@@ -86,6 +88,7 @@ class Cryptor(object):
         @in_encrypted: Base64 encoded 
         @key: hexified key
         '''
+        if env == 'demo': return ciphertext
         if ciphertext[:2] == "0x": ciphertext = ciphertext[2:]
         key = binascii.a2b_hex(in_key)
         iv = binascii.a2b_base64('MDAwMDAwMDAwMDAwMDAwMA==')

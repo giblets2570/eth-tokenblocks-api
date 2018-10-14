@@ -96,6 +96,27 @@ def Order(app):
 
     return toObject(order)
 
+  @app.route('/orders/{orderId}', cors=True, methods=['GET'])
+  @loggedinMiddleware(app)
+  @printError
+  def orders_show(orderId):
+    order = Database.find_one("Order", {"id": orderId})
+
+    order["broker"] = Database.find_one("User", {"id": order["brokerId"]}, ['id','name','email','address'])
+    order["token"] = toObject(Database.find_one("Token", {"id": order["tokenId"]}))
+    order["orderHoldings"] = Database.find("OrderHolding", {"orderId": order["id"]})
+
+    for orderHolding in order["orderHoldings"]:
+      orderHolding["security"] = toObject(Database.find_one("Security", {"id": orderHolding["securityId"]}))
+
+    order["orderTrades"] = Database.find("OrderTrade", {"orderId": order["id"]})
+    for orderTrade in order["orderTrades"]:
+      orderTrade["trade"] = toObject(Database.find_one("Trade", {"id": orderTrade["tradeId"]}))
+
+
+    return toObject(order)
+
+
   @app.route('/orders/complete', cors=True, methods=['PUT'])
   @printError
   def orders_complete():

@@ -13,15 +13,18 @@ else:
 
 debug = True
 
+env = os.environ.get('ENV', None)
+
 class Web3Helper():
 	@classmethod
 	def call(cls,contract,_method,*args):
+		if(env == 'demo'): return b''
 		method = getattr(contract.functions,_method)
 		return method(*args).call({'from': account})
 
 	@classmethod
 	def transact(cls,contract,_method,*args):
-		print("Price ",w3.eth.generateGasPrice())
+		if(env == 'demo'): return b''
 		method = getattr(contract.functions,_method)
 		# return method(*args).transact({'from': account})
 		try: 

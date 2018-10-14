@@ -3,7 +3,7 @@ import pymysql.cursors, os
 debug = False
 
 table_names = [
-  "User","Token","NavTimestamp","Security",
+  "User","Token","Security",
   "SecurityTimestamp","TokenBalance","TokenHoldings",
   "TokenHolding","Trade","TradeBroker","`Order`",
   "OrderHolding","OrderTrade"

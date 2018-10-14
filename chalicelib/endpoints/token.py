@@ -194,7 +194,7 @@ def Token(app):
   def tokens_contract_update():
     request = app.current_request
     data = request.json_body
-    Database.update("Token", {"symbol": data["symbol"]},{
+    Database.update("Token", {"symbol": data["symbol"]}, {
       "address": Web3Helper.toChecksumAddress(data["tokenAddress"]),
     })
     token = Database.find_one("Token",{"symbol": data["symbol"]})
@@ -202,7 +202,6 @@ def Token(app):
     tokenBalance = Database.find_one("TokenBalance", {"tokenId": token['id'], "userId": owner["id"]})
     if not tokenBalance:
       tokenBalance = Database.find_one("TokenBalance", {"tokenId": token['id'], "userId": owner["id"], "balance": data['initialAmount']}, insert=True)
-      print(tokenBalance)
     return toObject(token)
 
   @app.route("/tokens/contract/end-of-day", cors=True, methods=["PUT"])

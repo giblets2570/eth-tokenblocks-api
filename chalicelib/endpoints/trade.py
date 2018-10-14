@@ -171,7 +171,11 @@ def Trade(app):
     data = request.json_body
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
-    tradeBroker = Database.find_one("TradeBroker", {"tradeId": trade["id"], "brokerId": request.user["id"]})
+    
+    tradeBroker = Database.find_one("TradeBroker", {
+      "tradeId": trade["id"], 
+      "brokerId": request.user["id"]
+    })
     if not tradeBroker: raise NotFoundError("tradeBroker not found with trade id {}".format(tradeId))
     Database.update("TradeBroker", {"id": tradeBroker["id"]}, {"price": data["price"]})
     # Socket, should be pushing to a message queue of some kind
@@ -179,6 +183,7 @@ def Trade(app):
     return toObject(trade)
 
   @app.route("/trades/{tradeId}/claim", cors=True, methods=["PUT"])
+  @loggedinMiddleware(app)
   @printError
   def trades_claim(tradeId):
     trade = Database.find_one("Trade", {"id": int(tradeId)})
@@ -190,13 +195,28 @@ def Trade(app):
     if trade['state'] != 5:
       return {'message': 'Trade is in state {}, requires state 5'.format(trade['state'])}
 
-    # First move the funds from the investors bank account to the brokers account
-    moved = TL.move_funds(trade['brokerId'], trade['investorId'])
 
-    if not moved:
-      # Need to alert the smart contract that this trade hasn't worked
-      return {'message': "Funds have not been moved, tokens not distributed"}
-    
+    if amountInvested > 0:
+
+      # First move the funds from the investors bank account to the brokers account
+      moved = TL.move_funds(trade['brokerId'], trade['investorId'])
+
+      if not moved:
+        # Need to alert the smart contract that this trade hasn't worked
+        return {'message': "Funds have not been moved, tokens not distributed"}
+
+    else:
+
+      # Selling the tokens
+      # First move the funds from the investors bank account to the brokers account
+      moved = TL.move_funds(trade['investorId'], trade['brokerId'])
+
+      if not moved:
+        # Need to alert the smart contract that this trade hasn't worked
+        return {'message': "Funds have not been moved, tokens not sold"}
+
+
+
     # get todays nav and totalSupply
     token = Database.find_one('Token', {'id': trade['tokenId']})
 
@@ -209,16 +229,23 @@ def Trade(app):
       AUM += securityTimestamp['price'] * holding['securityAmount']
 
     NAV = AUM / float(token['totalSupply'])
-
-    effectiveNAV = (1+float(price)/10000)*NAV
-
     totalTokens = int(amountInvested / NAV)
-    investorTokens = int(amountInvested / effectiveNAV)
-    brokerTokens = totalTokens - investorTokens
 
-    print(NAV, effectiveNAV, price)
-    print(AUM, amountInvested)
-    print(totalTokens, investorTokens, brokerTokens)
+    investorTokens = None
+    brokerTokens = None
+    if amountInvested > 0:
+
+      effectiveNAV = (1+float(price)/10000)*NAV
+
+      investorTokens = int(amountInvested / effectiveNAV)
+      brokerTokens = totalTokens - investorTokens
+    else:
+      investorTokenBalance = Database.find_one("TokenBalance", {"tokenId": token["id"], "userId": investor["id"]})
+      if not investorTokenBalance['balance']: investorTokenBalance['balance'] = '0'
+      effectiveNAV = (1-float(price)/10000)*NAV
+      
+      investorTokens =  min(int(amountInvested / effectiveNAV), -1 * int(investorTokenBalance['balance']))
+      brokerTokens = totalTokens - investorTokens
 
     tokenContract = Web3Helper.getContract("ETT.json", token['address'])
     totalSupply = Web3Helper.call(tokenContract,'dateTotalSupply',arrow.get(trade['executionDate']).format('YYYY-MM-DD'),)
@@ -259,6 +286,7 @@ def Trade(app):
     if not trade: raise NotFoundError("trade not found with hash {}".format(tradeHash))
     
     Database.update("Trade", {"id": trade["id"]}, {"state": 1})
+    print(broker)
     Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": 1})
 
     # Socket, should be pushing to a message queue of some kind
