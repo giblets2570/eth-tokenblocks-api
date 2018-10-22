@@ -56,6 +56,7 @@ class Web3Helper():
 	@classmethod
 	def getContract(cls, filename, address=None):
 		contract_json = None
+		if(env == 'demo'): return None
 		if os.environ.get('CONTRACT_FOLDER', None):
 			folder = os.environ.get('CONTRACT_FOLDER', None)
 			with open(folder + filename, 'r') as file:

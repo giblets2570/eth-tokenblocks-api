@@ -31,7 +31,7 @@ def Trade(app):
     trade = Database.find_one("Trade", tradeData)
 
     if trade: return toObject(trade)
-    
+
     tradeData['state'] = 0
     Database.insert("Trade", tradeData)
     trade = Database.find_one("Trade", tradeData)
@@ -57,13 +57,13 @@ def Trade(app):
     trades = []
     tradeBrokers = []
     query = request.query_params or {}
-    if 'state' in query: 
+    if 'state' in query:
       query['state'] = int(query['state'])
 
     page = 0
     page_count = None
     total = None
-    
+
     if 'page' in query:
       page = int(query['page'])
       del query['page']
@@ -91,7 +91,7 @@ def Trade(app):
         _query["id"] = tradeId
         trade = Database.find_one("Trade", _query)
         if trade:
-          if trade["brokerId"] and trade["brokerId"] != request.user["id"]: continue          
+          if trade["brokerId"] and trade["brokerId"] != request.user["id"]: continue
           trade["tradeBrokers"] = [tradeBrokers[i]]
           trades += [trade]
       if page_count:
@@ -99,7 +99,7 @@ def Trade(app):
 
     tokenIds = list(set([o["tokenId"] for o in trades]))
     tokens = [Database.find_one("Token", {"id": t}) for t in tokenIds]
-    tokens = [toObject(t, ["id","address","cutoffTime","symbol","name","decimals"]) for t in tokens]
+    tokens = [toObject(t, ["id","address","cutoffTime","symbol","decimals"]) for t in tokens]
     tokens_hash = {token["id"]: token for token in tokens}
     for trade in trades:
       investor = Database.find_one("User", {"id": trade["investorId"]}, ["address", "id","name"])
@@ -125,8 +125,8 @@ def Trade(app):
     if trade['brokerId']:
       broker = Database.find_one("User", {"id": trade["brokerId"]}, ["address", "id","name"])
       trade["broker"] = broker
-    
-    token = Database.find_one("Token", {"id": trade["tokenId"]}, ["id","address","cutoffTime","symbol","name","decimals"])
+
+    token = Database.find_one("Token", {"id": trade["tokenId"]}, ["id","address","cutoffTime","symbol","decimals"])
     trade["token"] = token
 
     tradeBrokers = Database.find("TradeBroker", {"tradeId": trade["id"]})
@@ -171,9 +171,9 @@ def Trade(app):
     data = request.json_body
     trade = Database.find_one("Trade", {"id": int(tradeId)})
     if not trade: raise NotFoundError("trade not found with id {}".format(tradeId))
-    
+
     tradeBroker = Database.find_one("TradeBroker", {
-      "tradeId": trade["id"], 
+      "tradeId": trade["id"],
       "brokerId": request.user["id"]
     })
     if not tradeBroker: raise NotFoundError("tradeBroker not found with trade id {}".format(tradeId))
@@ -243,7 +243,7 @@ def Trade(app):
       investorTokenBalance = Database.find_one("TokenBalance", {"tokenId": token["id"], "userId": investor["id"]})
       if not investorTokenBalance['balance']: investorTokenBalance['balance'] = '0'
       effectiveNAV = (1-float(price)/10000)*NAV
-      
+
       investorTokens =  min(int(amountInvested / effectiveNAV), -1 * int(investorTokenBalance['balance']))
       brokerTokens = totalTokens - investorTokens
 
@@ -262,7 +262,7 @@ def Trade(app):
       'distributeTokens',
       trade['hash'],
       [
-        Web3Helper.toChecksumAddress(token['address']), 
+        Web3Helper.toChecksumAddress(token['address']),
         Web3Helper.toChecksumAddress(investor['address']),
         Web3Helper.toChecksumAddress(broker['address'])
       ],
@@ -284,9 +284,8 @@ def Trade(app):
     broker = Database.find_one("User", {"address": data["broker"]})
     trade = Database.find_one("Trade", {"hash": tradeHash})
     if not trade: raise NotFoundError("trade not found with hash {}".format(tradeHash))
-    
+
     Database.update("Trade", {"id": trade["id"]}, {"state": 1})
-    print(broker)
     Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": 1})
 
     # Socket, should be pushing to a message queue of some kind
@@ -311,4 +310,4 @@ def Trade(app):
     # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = state
-    return toObject(trade) 
+    return toObject(trade)

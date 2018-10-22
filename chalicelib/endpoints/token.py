@@ -16,46 +16,46 @@ def createHoldingsString(_holdings):
   # print(holdingsString)
   return holdingsString
 
-def Token(app):
+def createToken(data):
+  owner = None
+  ownerId = data["ownerId"] if "ownerId" in data else None
+  if not ownerId:
+    owner = Database.find_one("User", {"address": Web3Helper.account()})
+    ownerId = owner["id"]
+  else:
+    owner = Database.find_one("User", {"id": ownerId})
 
-  @app.route("/tokens", cors=True, methods=["POST"])
-  @loggedinMiddleware(app)
-  @printError
-  def tokens_post():
-    request = app.current_request
-    data = request.json_body
-    owner = None
-    ownerId = data["ownerId"] if "ownerId" in data else None
-    if not ownerId:
-      owner = Database.find_one("User", {"address": Web3Helper.account()})
-      ownerId = owner["id"]
-    else:
-      owner = Database.find_one("User", {"id": ownerId})
-    
-    if not owner: raise NotFoundError('No user found')
-    
-    token_data = {
-      "name": data["name"],
-      "decimals": data["decimals"],
-      "symbol": data["symbol"],
-      "cutoffTime": int(data["cutoffTime"]),
-      "fee": int(data["fee"]),
-      "ownerId": ownerId,
-      "totalSupply": data["initialAmount"]
-    }
+  if not owner: raise NotFoundError('No user found')
 
-    # Check if a token with the same symbol already exists
-    symbolToken = Database.find_one("Token", {"symbol": token_data["symbol"]})
-    if(symbolToken): raise ForbiddenError("Already a token with this address")
+  token_data = {
+    "fundId": data["fundId"],
+    "decimals": data["decimals"],
+    "symbol": data["symbol"],
+    "cutoffTime": int(data["cutoffTime"]),
+    "fee": int(data["fee"]),
+    "ownerId": ownerId,
+    "name": data["name"],
+    "totalSupply": data["initialAmount"],
+    "incomeCategory": data["incomeCategory"],
+    "minimumOrder": data["minimumOrder"],
+    "currency": data["minimumOrder"],
+  }
 
-    token = Database.find_one("Token", token_data, insert=True)
-    
-    tokenHoldings = Database.find_one("TokenHoldings",{
-      "tokenId": token['id'], 
-      "executionDate": str(datetime.today().date())
-    }, insert=True)
-    
-    holdings = []
+  if "fundId" in data: token_data["fundId"] = data["fundId"]
+
+  # Check if a token with the same symbol already exists
+  symbolToken = Database.find_one("Token", {"symbol": token_data["symbol"]})
+  if(symbolToken): raise ForbiddenError("Already a token with this symbol")
+
+  token = Database.find_one("Token", token_data, insert=True)
+
+  tokenHoldings = Database.find_one("TokenHoldings", {
+    "tokenId": token['id'],
+    "executionDate": str(datetime.today().date())
+  }, insert=True)
+
+  holdings = []
+  if 'holdings' in data:
     for holding in data['holdings']:
       # get the correct security
       security = Database.find_one("Security",{"symbol": holding["symbol"]})
@@ -80,32 +80,41 @@ def Token(app):
       price = holding['price'] if 'price' in holding else '0'
       securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': security["id"], 'price': price}, order_by='-createdAt', insert=True)
       tokenHolding = Database.find_one("TokenHolding",{
-        "securityId": security["id"], 
+        "securityId": security["id"],
         "securityAmount": holding["amount"],
         "tokenHoldingsId": tokenHoldings["id"]
       }, insert=True)
       holdings.append(tokenHolding)
 
-    holdingsString = createHoldingsString(holdings)
-    
-    try:
-      tx = Web3Helper.transact(
-        token_factory_contract,
-        'createETT',
-        token_data["name"],
-        token_data["decimals"],
-        token_data["symbol"],
-        int(data["initialAmount"]),
-        holdingsString,
-        token_data["cutoffTime"],
-        token_data["fee"],
-        Web3Helper.toChecksumAddress(owner['address']),
-      )
-      print(tx.hex())
-    except Exception as e:
-      print(e)
-      pass
+  holdingsString = createHoldingsString(holdings)
 
+  try:
+    tx = Web3Helper.transact(
+      token_factory_contract,
+      'createETT',
+      token_data["name"],
+      token_data["decimals"],
+      token_data["symbol"],
+      int(data["initialAmount"]),
+      holdingsString,
+      token_data["cutoffTime"],
+      token_data["fee"],
+      Web3Helper.toChecksumAddress(owner['address']),
+    )
+    print(tx.hex())
+  except Exception as e:
+    print(e)
+    pass
+
+def Token(app):
+
+  @app.route("/tokens", cors=True, methods=["POST"])
+  @loggedinMiddleware(app)
+  @printError
+  def tokens_post():
+    request = app.current_request
+    data = request.json_body
+    token = createToken(data)
     return toObject(token)
 
   @app.route("/tokens", cors=True, methods=["GET"])
@@ -149,7 +158,7 @@ def Token(app):
     if not token: raise NotFoundError("token not found with id {}".format(tokenId))
     tokenBalances = Database.find("TokenBalance", {"tokenId": token["id"]})
     for tokenBalance in tokenBalances:
-      investor = Database.find_one("User", {"id": tokenBalance["userId"]}, ["id", "name", "address"])
+      investor = Database.find_one("User", {"id": tokenBalance["userId"]}, ["id","name","type","juristiction","address"])
       tokenBalance["investor"] = investor
       tokenBalance["token"] = toObject(token)
     return toObject(tokenBalances)
@@ -199,6 +208,7 @@ def Token(app):
     })
     token = Database.find_one("Token",{"symbol": data["symbol"]})
     owner = Database.find_one("User",{"address": Web3Helper.toChecksumAddress(data["owner"])})
+    print(owner)
     tokenBalance = Database.find_one("TokenBalance", {"tokenId": token['id'], "userId": owner["id"]})
     if not tokenBalance:
       tokenBalance = Database.find_one("TokenBalance", {"tokenId": token['id'], "userId": owner["id"], "balance": data['initialAmount']}, insert=True)
@@ -245,7 +255,7 @@ def Token(app):
     print(NAV * math.pow(10, token['decimals']), AUM * math.pow(10, token['decimals']) / float(token['totalSupply']))
 
     # Create the new tokens at this NAV
-    # First need to collect the orders 
+    # First need to collect the orders
     verifiedOrders = Database.find("Order", {"state": 1, "executionDate": executionDate, "tokenId": token["id"]})
     print("Verified orders length: {}".format(len(verifiedOrders)))
     # Then the trades
@@ -318,4 +328,3 @@ def Token(app):
     print(tx.hex())
 
     return toObject(token)
-
