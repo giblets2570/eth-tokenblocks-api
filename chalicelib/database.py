@@ -1,6 +1,6 @@
 import pymysql.cursors, os
 
-debug = False
+debug = True
 
 table_names = [
   "User","Token","Security",
@@ -19,7 +19,7 @@ def create_connection():
     user = os.environ.get('MYSQL_USER', None),
     password = os.environ.get('MYSQL_PASSWORD', None),
     port = port,
-    charset = 'utf8mb4', 
+    charset = 'utf8mb4',
     cursorclass = pymysql.cursors.DictCursor
   )
   return connection

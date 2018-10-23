@@ -16,6 +16,16 @@ def createHoldingsString(_holdings):
   # print(holdingsString)
   return holdingsString
 
+def getBalances(tokenId):
+  token = Database.find_one("Token", {"id": int(tokenId)})
+  if not token: raise NotFoundError("token not found with id {}".format(tokenId))
+  tokenBalances = Database.find("TokenBalance", {"tokenId": token["id"]})
+  for tokenBalance in tokenBalances:
+    investor = Database.find_one("User", {"id": tokenBalance["userId"]}, ["id","name","type","juristiction","address"])
+    tokenBalance["investor"] = investor
+    tokenBalance["token"] = toObject(token)
+  return tokenBalances
+  
 def createToken(data):
   owner = None
   ownerId = data["ownerId"] if "ownerId" in data else None
@@ -153,14 +163,7 @@ def Token(app):
   @app.route("/tokens/{tokenId}/balances", cors=True, methods=["GET"])
   @printError
   def token_get_balances(tokenId):
-    request = app.current_request
-    token = Database.find_one("Token", {"id": int(tokenId)})
-    if not token: raise NotFoundError("token not found with id {}".format(tokenId))
-    tokenBalances = Database.find("TokenBalance", {"tokenId": token["id"]})
-    for tokenBalance in tokenBalances:
-      investor = Database.find_one("User", {"id": tokenBalance["userId"]}, ["id","name","type","juristiction","address"])
-      tokenBalance["investor"] = investor
-      tokenBalance["token"] = toObject(token)
+    tokenBalances = getBalances(tokenId)
     return toObject(tokenBalances)
 
   @app.route("/tokens/{tokenId}/holdings", cors=True, methods=["GET"])

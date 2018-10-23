@@ -38,6 +38,7 @@ def User(app):
   def user_put(userId):
     request = app.current_request
     data = request.json_body
+    print(data)
     if 'address' in data:
       data['address'] = Web3Helper.toChecksumAddress(data['address'])
       tx = Web3Helper.transact(
@@ -112,7 +113,7 @@ def User(app):
   def feeTaken():
     request = app.current_request
     data = request.json_body
-    print(data) 
+    print(data)
 
     # return {"testing": "testing"}
     token = Database.find_one("Token", {"address": data["token"]})
@@ -153,7 +154,7 @@ def User(app):
 
     user = refresh_user_token(user)
     balance = Truelayer.get_balance(user)
-    
+
     balance_small = int(balance['available'] * 100)
 
     if(balance_small < amount):
