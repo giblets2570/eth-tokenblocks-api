@@ -1,6 +1,6 @@
 import pymysql.cursors, os
 
-debug = True
+debug = False
 
 table_names = [
   "User","Token","Security",
@@ -76,7 +76,7 @@ class Database(object):
     if return_inserted: return cls.find_one(table_name, data)
 
   @classmethod
-  def find_one(cls, table_name, query=[], return_filter = ['*'], insert = False, order_by=None):
+  def find_one(cls, table_name, query=[], return_filter = ['*'], insert = False, order_by=None, for_update=False):
     if(type(query) == dict): query = cls.data_to_query(query)
     if(type(query) == tuple): query = [query]
     if(len(query) and type(query[0]) == tuple): query = [query]
@@ -95,6 +95,7 @@ class Database(object):
       values = tuple(values)
       sql = "SELECT {} FROM `{}` WHERE {}".format(return_filter_values, table_name, wheres)
       if order_by: sql += " ORDER BY {}".format(order_by)
+      if for_update: sql += " FOR UPDATE"
       cursor.execute(sql, values)
       if debug: print(sql)
       result = cursor.fetchone()
@@ -148,10 +149,6 @@ class Database(object):
     if(len(query) and type(query[0]) == tuple): query = [query]
     result = None
     with connection.cursor() as cursor:
-      # query_keys = query.keys()
-      # query_values = tuple([query[k] for k in query_keys])
-      # wheres = " AND ".join((["`{}`=%s".format(k) for k in query_keys]))
-
       wheres = []
       query_values = []
       for q in query:

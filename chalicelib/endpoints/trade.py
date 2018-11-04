@@ -12,6 +12,37 @@ assert socket_uri != None
 
 tradeKernelContract = Web3Helper.getContract("TradeKernel.json")
 
+def takeFunds(trade):
+  print("Taking funds", trade['state'])
+  decrypted = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
+  price = Cryptor.decryptInput(trade['price'], trade['sk'])
+
+  # Ill need to include the currency here
+  amountInvested = int(decrypted.split(':')[1])
+  if trade['state'] != 4:
+    return {'message': 'Trade is in state {}, requires state 4'.format(trade['state'])}
+
+  # if amountInvested > 0:
+  #   # First move the funds from the investors bank account to the brokers account
+  #   moved = TL.move_funds(trade['brokerId'], trade['investorId'])
+  #   if not moved:
+  #     # Need to alert the smart contract that this trade hasn't worked
+  #     return {'message': "Funds have not been moved, tokens not distributed"}
+  # else:
+  #   # Selling the tokens
+  #   # First move the funds from the investors bank account to the brokers account
+  #   moved = TL.move_funds(trade['investorId'], trade['brokerId'])
+  #   if not moved:
+  #     # Need to alert the smart contract that this trade hasn't worked
+  #     return {'message': "Funds have not been moved, tokens not sold"}
+
+  tx = Web3Helper.transact(
+    tradeKernelContract,
+    'transferFunds',
+    trade['hash'],
+  )
+  print(tx.hex())
+
 def Trade(app):
   @app.route("/trades", cors=True, methods=["POST"])
   @loggedinMiddleware(app)
@@ -44,7 +75,6 @@ def Trade(app):
       tradeBrokerData['state'] = 0
       Database.insert("TradeBroker", tradeBrokerData)
       tradeBroker = Database.find_one("TradeBroker", tradeBrokerData)
-
     # Socket, should be pushing to a message queue of some kind
     r = passWithoutError(requests.post)(socket_uri + "trade-created", data=data)
     return toObject(trade)
@@ -97,6 +127,37 @@ def Trade(app):
       if page_count:
         trades = trades[page*page_count: (page+1)*page_count]
 
+    elif request.user["role"] == "issuer":
+      # first find all the funds the issuer owns
+      funds = Database.find("Fund")
+      fundIds = [o['id'] for o in funds]
+      tokenQuery = [[('fundId','=',fundId)] for fundId in fundIds]
+      tokens = Database.find("Token", tokenQuery)
+      tokenIds = [o['id'] for o in tokens]
+      tradeQuery = []
+      if 'tokenId' in query:
+        tokenIds = [t for t in tokenIds if t == int(query['tokenId'])]
+      if 'investorId' in query:
+        tradeQuery = [[
+          ('tokenId','=',tokenId),
+          ('investorId','=',query['investorId'])
+        ] for tokenId in tokenIds]
+      else:
+        tradeQuery = [[('tokenId','=',tokenId)] for tokenId in tokenIds]
+      print(tradeQuery)
+      trades = None
+
+      if page_count:
+        dbRes = Database.find("Trade", tradeQuery, page=page, page_count=page_count)
+        trades = dbRes['data']
+        total = dbRes['total']
+      else:
+        trades = Database.find("Trade", tradeQuery)
+
+      for trade in trades:
+        tradeBrokers = Database.find("TradeBroker", {"tradeId": trade["id"]})
+        trade['tradeBrokers'] = tradeBrokers
+
     tokenIds = list(set([o["tokenId"] for o in trades]))
     tokens = [Database.find_one("Token", {"id": t}) for t in tokenIds]
     tokens = [toObject(t, ["id","address","cutoffTime","symbol","decimals"]) for t in tokens]
@@ -145,7 +206,7 @@ def Trade(app):
 
     trade = Database.update("Trade", {"id": int(tradeId)}, data, return_updated=True)[0]
     # Socket, should be pushing to a message queue of some kind
-    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data=toObject(trade))
     return toObject(trade)
 
   @app.route("/trades/{tradeId}", cors=True, methods=["DELETE"])
@@ -159,7 +220,7 @@ def Trade(app):
 
     trade = Database.update("Trade", {"id": int(tradeId)}, {'state': 3}, return_updated=True)[0]
     # Socket, should be pushing to a message queue of some kind
-    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data=toObject(trade))
     return toObject(trade)
 
 
@@ -179,7 +240,7 @@ def Trade(app):
     if not tradeBroker: raise NotFoundError("tradeBroker not found with trade id {}".format(tradeId))
     Database.update("TradeBroker", {"id": tradeBroker["id"]}, {"price": data["price"]})
     # Socket, should be pushing to a message queue of some kind
-    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data=toObject(trade))
     return toObject(trade)
 
   @app.route("/trades/{tradeId}/claim", cors=True, methods=["PUT"])
@@ -195,67 +256,32 @@ def Trade(app):
     if trade['state'] != 5:
       return {'message': 'Trade is in state {}, requires state 5'.format(trade['state'])}
 
-
-    if amountInvested > 0:
-
-      # First move the funds from the investors bank account to the brokers account
-      moved = TL.move_funds(trade['brokerId'], trade['investorId'])
-
-      if not moved:
-        # Need to alert the smart contract that this trade hasn't worked
-        return {'message': "Funds have not been moved, tokens not distributed"}
-
-    else:
-
-      # Selling the tokens
-      # First move the funds from the investors bank account to the brokers account
-      moved = TL.move_funds(trade['investorId'], trade['brokerId'])
-
-      if not moved:
-        # Need to alert the smart contract that this trade hasn't worked
-        return {'message': "Funds have not been moved, tokens not sold"}
-
-
-
+    # get trade dates nav
+    nav = Database.find_one("NAVTimestamp", {"tokenId": trade["tokenId"]}, order_by='-createdAt')
     # get todays nav and totalSupply
     token = Database.find_one('Token', {'id': trade['tokenId']})
 
-    tokenHoldings = Database.find_one("TokenHoldings",{"tokenId": token["id"]}, order_by='-createdAt')
-    allTokenHoldings = Database.find("TokenHolding",{"tokenHoldingsId": tokenHoldings["id"]})
-
-    AUM = 0
-    for holding in allTokenHoldings:
-      securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': holding["securityId"]}, order_by='-createdAt')
-      AUM += securityTimestamp['price'] * holding['securityAmount']
-
-    NAV = AUM / float(token['totalSupply'])
-    totalTokens = int(amountInvested / NAV)
+    totalTokens = int(amountInvested / nav['price'])
 
     investorTokens = None
-    brokerTokens = None
     if amountInvested > 0:
-
-      effectiveNAV = (1+float(price)/10000)*NAV
-
-      investorTokens = int(amountInvested / effectiveNAV)
-      brokerTokens = totalTokens - investorTokens
+      effectiveNAV = (1.0+float(price)/100)*nav['price']
+      investorTokens = amountInvested / effectiveNAV
     else:
       investorTokenBalance = Database.find_one("TokenBalance", {"tokenId": token["id"], "userId": investor["id"]})
       if not investorTokenBalance['balance']: investorTokenBalance['balance'] = '0'
-      effectiveNAV = (1-float(price)/10000)*NAV
-
+      effectiveNAV = (1-float(price)/100)*nav['price']
       investorTokens =  min(int(amountInvested / effectiveNAV), -1 * int(investorTokenBalance['balance']))
-      brokerTokens = totalTokens - investorTokens
 
     tokenContract = Web3Helper.getContract("ETT.json", token['address'])
     totalSupply = Web3Helper.call(tokenContract,'dateTotalSupply',arrow.get(trade['executionDate']).format('YYYY-MM-DD'),)
 
     # find number of tokens user allocated
-    numberTokens = 0 if not NAV else math.floor(amountInvested * totalSupply / NAV)
+    numberTokens = 0 if not nav['price'] else math.floor(amountInvested * totalSupply / nav['price'])
+    investorTokens = int(investorTokens * math.pow(10, token['decimals']))
 
     # now ask the contract to distribute the tokens (maybe should be the investor that does this)
     investor = Database.find_one("User", {"id": trade["investorId"]})
-    broker = Database.find_one("User", {"id": trade["brokerId"]})
     tradeKernelContract = Web3Helper.getContract("TradeKernel.json")
     tx = Web3Helper.transact(
       tradeKernelContract,
@@ -264,11 +290,9 @@ def Trade(app):
       [
         Web3Helper.toChecksumAddress(token['address']),
         Web3Helper.toChecksumAddress(investor['address']),
-        Web3Helper.toChecksumAddress(broker['address'])
       ],
       [
-        investorTokens,
-        brokerTokens
+        investorTokens
       ]
     )
     print(tx.hex())
@@ -288,9 +312,9 @@ def Trade(app):
     Database.update("Trade", {"id": trade["id"]}, {"state": 1})
     Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": 1})
 
-    # Socket, should be pushing to a message queue of some kind
-    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = 1
+    # Socket, should be pushing to a message queue of some kind
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data=toObject(trade))
     return toObject(trade)
 
   @app.route("/trades/cancel", cors=True, methods=["PUT"])
@@ -307,7 +331,16 @@ def Trade(app):
     Database.update("Trade", {"id": trade["id"]}, {"state": state})
     Database.update("TradeBroker", {"tradeId": trade["id"], "brokerId": broker["id"]}, {"state": state})
 
-    # Socket, should be pushing to a message queue of some kind
-    r = passWithoutError(requests.post)(socket_uri + "trade-update", data={"id": trade["id"]})
     trade["state"] = state
+    # Socket, should be pushing to a message queue of some kind
+    r = passWithoutError(requests.post)(socket_uri + "trade-update", data=toObject(trade))
+    return toObject(trade)
+
+  @app.route("/trades/funds-transfered", cors=True, methods=["PUT"])
+  @printError
+  def trades_funds_transfered():
+    request = app.current_request
+    data = request.json_body
+    tradeHash = data['tradeHash']
+    trade = Database.update("Trade", {"hash": tradeHash}, {'state': 5})
     return toObject(trade)

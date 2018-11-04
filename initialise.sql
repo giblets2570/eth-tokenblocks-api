@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS TokenHoldings;
 DROP TABLE IF EXISTS TokenBalance;
 DROP TABLE IF EXISTS SecurityTimestamp;
 DROP TABLE IF EXISTS Security;
+DROP TABLE IF EXISTS NAVTimestamp;
 DROP TABLE IF EXISTS Token;
 DROP TABLE IF EXISTS Fund;
 DROP TABLE IF EXISTS User;
@@ -32,12 +33,14 @@ CREATE TABLE User (
   truelayerAccessToken VARCHAR(1500),
   truelayerRefreshToken VARCHAR(100),
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE Fund (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50)
-);
+  name VARCHAR(50),
+  ownerId INT UNSIGNED,
+  FOREIGN KEY (ownerId) REFERENCES User(id)
+) ENGINE=InnoDB;
 
 CREATE TABLE Token (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -58,7 +61,16 @@ CREATE TABLE Token (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (ownerId) REFERENCES User(id),
   FOREIGN KEY (fundId) REFERENCES Fund(id)
-);
+) ENGINE=InnoDB;
+
+CREATE TABLE NAVTimestamp (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tokenId INT UNSIGNED,
+  price INT UNSIGNED, -- pennies
+  executionDate DATE,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (tokenId) REFERENCES Token(id)
+) ENGINE=InnoDB;
 
 CREATE TABLE Security (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -69,7 +81,7 @@ CREATE TABLE Security (
   sector VARCHAR(50),
   class VARCHAR(50),
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE SecurityTimestamp (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -79,7 +91,7 @@ CREATE TABLE SecurityTimestamp (
   executionDate DATE,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (securityId) REFERENCES Security(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE TokenBalance (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -89,7 +101,7 @@ CREATE TABLE TokenBalance (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (tokenId) REFERENCES Token(id),
   FOREIGN KEY (userId) REFERENCES User(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE TokenHoldings (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -97,7 +109,7 @@ CREATE TABLE TokenHoldings (
   executionDate DATE,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (tokenId) REFERENCES Token(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE TokenHolding (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -107,7 +119,7 @@ CREATE TABLE TokenHolding (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (tokenHoldingsId) REFERENCES TokenHoldings(id),
   FOREIGN KEY (securityId) REFERENCES Security(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE Trade (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -121,7 +133,7 @@ CREATE TABLE Trade (
   executionDate DATE,
   expirationTimestampInSec BIGINT UNSIGNED,
   salt INT UNSIGNED,
-  state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == confirmed, 2 == verified, 3 == investor cancel, 4 == broker cancel, 5 == created, 6 == claimed
+  state INT UNSIGNED DEFAULT 0, -- 0 == created, 1 == confirmed, 2 == investor cancel, 3 == fund cancel, 4 == funds taken, 5 == finished, 6 == claimed
   signature VARCHAR(300),
   hash VARCHAR(200),
   sk VARCHAR(200),
@@ -130,7 +142,7 @@ CREATE TABLE Trade (
   FOREIGN KEY (tokenId) REFERENCES Token(id),
   FOREIGN KEY (brokerId) REFERENCES User(id),
   FOREIGN KEY (investorId) REFERENCES User(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE TradeBroker (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -143,7 +155,7 @@ CREATE TABLE TradeBroker (
   state INT, -- 0 == initialize, 1 == chosen, 2 == disguarded
   FOREIGN KEY (brokerId) REFERENCES User(id),
   FOREIGN KEY (tradeId) REFERENCES Trade(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE `Order` (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -157,7 +169,7 @@ CREATE TABLE `Order` (
   hash VARCHAR(200),
   FOREIGN KEY (brokerId) REFERENCES User(id),
   FOREIGN KEY (tokenId) REFERENCES Token(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE OrderHolding (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -167,7 +179,7 @@ CREATE TABLE OrderHolding (
   cost INT,
   FOREIGN KEY (orderId) REFERENCES `Order`(id),
   FOREIGN KEY (securityId) REFERENCES Security(id)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE OrderTrade (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -175,4 +187,4 @@ CREATE TABLE OrderTrade (
   tradeId INT UNSIGNED,
   FOREIGN KEY (orderId) REFERENCES `Order`(id),
   FOREIGN KEY (tradeId) REFERENCES Trade(id)
-);
+) ENGINE=InnoDB;

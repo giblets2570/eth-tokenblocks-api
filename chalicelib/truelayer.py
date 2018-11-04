@@ -1,4 +1,4 @@
-import requests, os, arrow, json
+import requests, os, arrow
 
 truelayer_client_id = os.getenv('TRUELAYER_CLIENT_ID', None)
 truelayer_client_secret = os.getenv('TRUELAYER_CLIENT_SECRET', None)
@@ -17,12 +17,12 @@ class Truelayer(object):
       "client_secret": truelayer_client_secret,
       "refresh_token": user['truelayerRefreshToken'],
     }
-    r = json.loads(requests.post("https://auth.truelayer.com/connect/token", data=data).text)
+    r = requests.post("https://auth.truelayer.com/connect/token", data=data).json()
     return {
       "truelayerAccessToken": r["access_token"],
       "truelayerRefreshToken": r["refresh_token"]
     }
-    
+
   @classmethod
   def get_access_token(cls, user, code):
     data = {
@@ -32,7 +32,7 @@ class Truelayer(object):
       "client_secret": truelayer_client_secret, # Required The client secret you received after registering your application.
       "redirect_uri": truelayer_redirect_uri, #  Required Your application’s redirect URI
     }
-    r = json.loads(requests.post("https://auth.truelayer.com/connect/token", data=data).text)
+    r = requests.post("https://auth.truelayer.com/connect/token", data=data).json()
     return {
       "truelayerAccessToken": r["access_token"],
       "truelayerRefreshToken": r["refresh_token"]
@@ -42,21 +42,22 @@ class Truelayer(object):
   def get_accounts(cls, user):
     headers = {'Authorization': 'Bearer {}'.format(user['truelayerAccessToken'])}
     r = requests.get("https://api.truelayer.com/data/v1/accounts", headers=headers)
-    accounts = json.loads(r.text)['results']
+    accounts = r.json()['results']
     return accounts
 
   @classmethod
   def get_balance(cls, user):
     headers = {'Authorization': 'Bearer {}'.format(user['truelayerAccessToken'])}
     url = "https://api.truelayer.com/data/v1/accounts/{}/balance".format(user['truelayerAccountId'])
+    print(url)
     r = requests.get(url, headers=headers)
-    result = json.loads(r.text)['results'][0]
+    result = r.json()['results'][0]
     return result
 
   @classmethod
   def move_funds(cls, *args, **kwargs):
     return True
-  
+
   @classmethod
   def get_auth_url(cls, nonce):
     scope = "info%20accounts%20balance%20transactions%20offline_access"
@@ -70,8 +71,9 @@ class Truelayer(object):
     previous = now.shift(months=-1)
     url = "https://api.truelayer.com/data/v1/accounts/{}/transactions?from={}".format(user['truelayerAccountId'],previous.format('YYYY-MM-DDTHH:mm:ss'))
     headers = {'Authorization': 'Bearer {}'.format(user['truelayerAccessToken'])}
-
+    print(headers)
+    print(url)
     r = requests.get(url, headers=headers)
-    transactions = json.loads(r.text)['results']
+    transactions = r.json()['results']
 
     return transactions

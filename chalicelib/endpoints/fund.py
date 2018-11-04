@@ -4,7 +4,7 @@ from chalice import NotFoundError, ForbiddenError
 from chalicelib.utilities import *
 from chalicelib.web3helper import Web3Helper
 from chalicelib.endpoints.token import createToken, getBalances
-import jwt, os, json, arrow, math, hashlib
+import jwt, os, json, math, hashlib
 
 def Fund(app):
 
@@ -24,7 +24,8 @@ def Fund(app):
     if not owner: raise NotFoundError('No user found')
 
     fund_data = {
-      "name": data["name"]
+      "name": data["name"],
+      "ownerId": ownerId
     }
 
     fund = Database.find_one('Fund', fund_data, insert=True)
@@ -43,6 +44,7 @@ def Fund(app):
         "incomeCategory": token["incomeCategory"],
         "minimumOrder": token["minimumOrder"]
       }
+      if "nav" in token: token_data["nav"] = token['nav']
       if "holdings" in token: token_data["holdings"] = token["holdings"]
       token = createToken(token_data)
       print(token)

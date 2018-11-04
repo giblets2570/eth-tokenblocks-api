@@ -5,17 +5,17 @@ from chalice import Response, NotFoundError
 from chalicelib.web3helper import Web3Helper
 import os, json, random
 
-front_end_url = os.environ.get('FRONT_END','http://localhost:3001/#/')
+front_end_url = os.environ.get('FRONT_END','http://localhost:3000/')
 
 permissions_contract = Web3Helper.getContract("Permissions.json")
 
 def refresh_user_token(user):
-  Database.update(
-    'User', 
+  return Database.update(
+    'User',
     {"id": user["id"]},
-    TL.get_refresh_token(user)
-  )
-  return Database.find_one("User", {'id': user["id"]})
+    TL.get_refresh_token(user),
+    return_updated=True
+  )[0]
 
 def Truelayer(app):
   @app.route('/truelayer')
@@ -62,6 +62,6 @@ def Truelayer(app):
       body=None,
       status_code=302,
       headers={
-        "Location" : "{}dashboard/profile/setup".format(front_end_url)
+        "Location" : "{}setup".format(front_end_url)
       }
     )
