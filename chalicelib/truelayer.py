@@ -51,6 +51,7 @@ class Truelayer(object):
     url = "https://api.truelayer.com/data/v1/accounts/{}/balance".format(user['truelayerAccountId'])
     print(url)
     r = requests.get(url, headers=headers)
+    print(r.json())
     result = r.json()['results'][0]
     return result
 

@@ -33,7 +33,10 @@ def User(app):
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))
     user['bankConnected'] = not not user['truelayerAccessToken']
-    return toObject(user, ['id', 'name', 'address', 'role', 'ik', 'spk', 'signature', 'bankConnected', 'truelayerAccountId'])
+    return toObject(user, [
+      'id','name','address','role','ik','spk','signature','bankConnected','identity','juristiction'
+      'addressLine1','addressLine2','city','postcode','country','truelayerAccountId'
+    ])
 
   @app.route('/users/{userId}', cors=True, methods=['PUT'])
   @loggedinMiddleware(app)
@@ -44,11 +47,11 @@ def User(app):
 
     if 'address' in data:
       # Find if another user
-      requestingUser = request.user
+      # requestingUser = request.user
       data['address'] = Web3Helper.toChecksumAddress(data['address'])
-      user = Database.find_one("User", {'address': data['address']})
-      if user and user['id'] != requestingUser['id']:
-        raise ForbiddenError('user already exists with address {}'.format(data['address']))
+      # user = Database.find_one("User", {'address': data['address']})
+      # if user and user['id'] != requestingUser['id']:
+      #   raise ForbiddenError('user already exists with address {}'.format(data['address']))
 
     user = Database.find_one("User", {'id': int(userId)})
     if not user: raise NotFoundError('user not found with id {}'.format(userId))

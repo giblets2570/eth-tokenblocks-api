@@ -32,6 +32,17 @@ CREATE TABLE User (
   truelayerAccountId VARCHAR(50),
   truelayerAccessToken VARCHAR(1500),
   truelayerRefreshToken VARCHAR(100),
+
+  -- Address
+  addressLine1 VARCHAR(150),
+  addressLine2 VARCHAR(150),
+  city VARCHAR(100),
+  postcode  VARCHAR(100),
+  country VARCHAR(100),
+
+  -- id
+  identity TEXT,
+
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

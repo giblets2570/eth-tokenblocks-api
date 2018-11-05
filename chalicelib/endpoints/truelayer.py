@@ -62,6 +62,6 @@ def Truelayer(app):
       body=None,
       status_code=302,
       headers={
-        "Location" : "{}setup".format(front_end_url)
+        "Location" : "{}investor/profile".format(front_end_url)
       }
     )
