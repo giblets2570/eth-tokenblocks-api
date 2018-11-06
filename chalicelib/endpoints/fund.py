@@ -47,7 +47,6 @@ def Fund(app):
       if "nav" in token: token_data["nav"] = token['nav']
       if "holdings" in token: token_data["holdings"] = token["holdings"]
       token = createToken(token_data)
-      print(token)
 
     return toObject(fund)
 
@@ -92,11 +91,9 @@ def Fund(app):
       if not token_balance['balance']: continue
       id = token_balance['investor']['id']
       if id in user_hash:
-        print(total_balance[user_hash[id]]['balance'], token_balance['balance'])
         total_balance[user_hash[id]]['balance'] = int(total_balance[user_hash[id]]['balance'])
         total_balance[user_hash[id]]['balance'] += int(token_balance['balance'])
         total_balance[user_hash[id]]['balance'] = str(total_balance[user_hash[id]]['balance'])
-        print(total_balance[user_hash[id]]['balance'])
       else:
         index = len(total_balance)
         user_hash[id] = index

@@ -234,6 +234,39 @@ def Token(app):
     totalAmount = getInvested(tokenId, user)
     return toObject({"totalAmount": totalAmount})
 
+  @app.route("/tokens/{tokenId}/dividends", cors=True, methods=["POST"])
+  @loggedinMiddleware(app, 'issuer')
+  @printError
+  def token_post_dividend(tokenId):
+    request = app.current_request
+    user = request.user
+    data = request.json_body
+
+    amount = data["amount"]
+    currency = data["currency"]
+    paymentDate = data["paymentDate"]
+    exDividendDate = data["exDividendDate"]
+
+    dividend = {
+      "amount": amount,
+      "tokenId": tokenId,
+      "currency": currency,
+      "paymentDate": paymentDate,
+      "exDividendDate": exDividendDate
+    }
+    dividend = Database.insert("Dividend", dividend, return_inserted=True)
+    return toObject(dividend)
+
+  @app.route("/tokens/{tokenId}/dividends", cors=True, methods=["GET"])
+  @loggedinMiddleware(app)
+  @printError
+  def token_get_dividends(tokenId):
+    request = app.current_request
+    user = request.user
+    data = request.json_body
+    dividends = Database.find("Dividend", {"tokenId": tokenId})
+    return toObject(dividends)
+
   @app.route("/tokens/contract/update", cors=True, methods=["PUT"])
   @printError
   def tokens_contract_update():
@@ -305,117 +338,3 @@ def Token(app):
     print(tx.hex())
 
     return toObject(nav)
-
-  # @app.route("/tokens/contract/end-of-day", cors=True, methods=["PUT"])
-  # @printError
-  # def tokens_contract_end_of_day():
-  #   request = app.current_request
-  #   data = request.json_body
-  #   totalSupply = int(float(data["totalSupply"]))
-  #   time = data["time"]
-  #   executionDate = arrow.get(time).format('YYYY-MM-DD')
-  #
-  #   token = Database.find_one("Token",{"address": data["token"]})
-  #   print("Token {}".format(token['symbol']))
-  #   print("Total Supplys")
-  #   print("Old {}, New {}".format(float(token['totalSupply']), totalSupply))
-  #   print("Increase: {}".format(360 * (totalSupply/float(token['totalSupply']))))
-  #   tokenHoldings = Database.find_one("TokenHoldings",{"tokenId": token["id"]}, order_by='-createdAt')
-  #   allTokenHoldings = Database.find("TokenHolding",{"tokenHoldingsId": tokenHoldings["id"]})
-  #
-  #   AUM = 0
-  #   for holding in allTokenHoldings:
-  #     securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': holding["securityId"]}, order_by='-createdAt')
-  #     AUM += securityTimestamp['price'] * holding['securityAmount']
-  #
-  #   # create the new token holdings
-  #   Database.insert("TokenHoldings",{"tokenId": token['id'], "executionDate": executionDate})
-  #   newTokenHoldings = Database.find_one("TokenHoldings",{"tokenId": token['id'], "executionDate": executionDate}, order_by='-createdAt')
-  #   newAllTokenHoldings = []
-  #   print("Token Holdings Length: {}".format(len(allTokenHoldings)))
-  #   for tokenHolding in allTokenHoldings:
-  #     newAllTokenHoldings.append({
-  #       "securityId": tokenHolding['securityId'],
-  #       "securityAmount": tokenHolding['securityAmount'],
-  #       "tokenHoldingsId": newTokenHoldings['id']
-  #     })
-  #
-  #   # calculate the new NAV
-  #   NAV = AUM / totalSupply
-  #
-  #   print(NAV * math.pow(10, token['decimals']), AUM * math.pow(10, token['decimals']) / float(token['totalSupply']))
-  #
-  #   # Create the new tokens at this NAV
-  #   # First need to collect the orders
-  #   verifiedOrders = Database.find("Order", {"state": 1, "executionDate": executionDate, "tokenId": token["id"]})
-  #   print("Verified orders length: {}".format(len(verifiedOrders)))
-  #   # Then the trades
-  #   allOrderTrades = []
-  #   for order in verifiedOrders:
-  #     # update the token holdings
-  #     orderHoldings = Database.find("OrderHolding", {"orderId": order["id"]})
-  #     orderHoldingsHash = {orderHolding['securityId']: orderHolding for orderHolding in orderHoldings}
-  #     for tokenHolding in newAllTokenHoldings:
-  #       tokenHolding['securityAmount'] += orderHoldingsHash[tokenHolding['securityId']]['amount']
-  #
-  #     # Gather the trades
-  #     orderTrades = Database.find("OrderTrade", {"orderId": order["id"]})
-  #     tradeIds = [o['tradeId'] for o in orderTrades]
-  #     tradeQuery = [[('id','=',tradeId)] for tradeId in tradeIds]
-  #     trades = Database.find("Trade", tradeQuery)
-  #     allOrderTrades += trades
-  #
-  #   for tokenHolding in newAllTokenHoldings:
-  #     print(tokenHolding)
-  #     Database.insert("TokenHolding", tokenHolding)
-  #   # Create the holdings string
-  #   print('newAllTokenHoldings length: {}'.format(len(newAllTokenHoldings)))
-  #   holdingsString = createHoldingsString(newAllTokenHoldings)
-  #
-  #   # and set all orders to completed
-  #   orderQuery = [[('id','=',o['id'])] for o in verifiedOrders]
-  #   Database.update('Order', orderQuery, {'state': 2})
-  #
-  #   # Need to go through each trade and get the NAV+price
-  #   supplyUpdate = 0
-  #   for trade in allOrderTrades:
-  #     decryptedNominalAmount = Cryptor.decryptInput(trade['nominalAmount'], trade['sk'])
-  #     amountInvested = int(decryptedNominalAmount.split(':')[1])
-  #     price = Cryptor.decryptInput(trade['price'], trade['sk'])
-  #     price = float(price)
-  #     effectiveNAV = NAV*(100.0+price)/100.0
-  #     print(amountInvested, NAV)
-  #     supplyUpdate += int(amountInvested * 1.0 / NAV)
-  #
-  #   tokenContract = Web3Helper.getContract("ETT.json", token['address'])
-  #
-  #   newAUM = 0
-  #   for holding in newAllTokenHoldings:
-  #     securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': holding["securityId"]}, order_by='-createdAt')
-  #     newAUM += securityTimestamp['price'] * holding['securityAmount']
-  #
-  #   print("supplyUpdate", supplyUpdate)
-  #   print("oldSupply", totalSupply)
-  #   print("newSupply", supplyUpdate + totalSupply)
-  #   print("oldAUM", AUM)
-  #   print("newAUM", newAUM)
-  #
-  #   print("\n===================\n")
-  #   print("New NAV", newAUM / (supplyUpdate + totalSupply))
-  #
-  #
-  #   # Update trades to be ready for claiming
-  #   tradeQuery = [[('id','=',t['id'])] for t in allOrderTrades]
-  #   Database.update("Trade", tradeQuery, {'state': 5})
-  #
-  #   tx = Web3Helper.transact(
-  #     tokenContract,
-  #     'updateTotalSupply',
-  #     supplyUpdate,
-  #     holdingsString,
-  #     executionDate
-  #   )
-  #   # tx = b''
-  #   print(tx.hex())
-  #
-  #   return toObject(token)

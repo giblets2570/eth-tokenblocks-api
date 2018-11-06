@@ -50,7 +50,7 @@ def Order(app):
       for orderTrade in order["orderTrades"]:
         orderTrade["trade"] = toObject(Database.find_one("Trade", {"id": orderTrade["tradeId"]}))
 
-    if single: 
+    if single:
       return toObject(orders[0])
 
     return {"data": toObject(orders), "total": total}
@@ -113,7 +113,6 @@ def Order(app):
     for orderTrade in order["orderTrades"]:
       orderTrade["trade"] = toObject(Database.find_one("Trade", {"id": orderTrade["tradeId"]}))
 
-
     return toObject(order)
 
 
@@ -154,7 +153,7 @@ def Order(app):
     for tokenHolding in tokenHoldings:
       securityTimestamp = Database.find_one('SecurityTimestamp', {'securityId': tokenHolding["securityId"]}, order_by='-createdAt')
       newAUM += securityTimestamp['price'] * tokenHolding['securityAmount']
-    
+
     executionDateString = arrow.get(executionDate).format('YYYY-MM-DD')
 
     tx = Web3Helper.transact(tokenContract, 'endOfDay', executionDateString)

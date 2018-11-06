@@ -25,6 +25,7 @@ def loggedinMiddleware(app, role=None):
         setattr(app.current_request, 'user', fake_user)
         return func(*args, **kwargs)
       headers = app.current_request.headers
+      # print(headers)
       if 'authorization' not in headers: raise ForbiddenError("You aren't authenticated")
       authorization = headers['authorization'].replace('Bearer ', '')
       try:

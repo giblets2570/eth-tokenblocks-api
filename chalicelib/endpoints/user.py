@@ -5,6 +5,10 @@ from chalicelib.utilities import *
 from chalicelib.web3helper import Web3Helper
 from chalicelib.endpoints.truelayer import refresh_user_token
 from chalicelib.truelayer import Truelayer as TL
+import boto3
+
+S3 = boto3.client('s3', region_name='eu-west-2')
+BUCKET = 'tokenblocks-uploads'
 
 permissions_contract = Web3Helper.getContract("Permissions.json")
 
@@ -108,7 +112,22 @@ def User(app):
     balance = TL.get_balance(user)
     return toObject(balance)
 
-
+  @app.route('/policy', cors=True, methods=['GET'])
+  @loggedinMiddleware(app)
+  @printError
+  def policy():
+    request = app.current_request
+    key = request.query_params['key']
+    # Generate the POST attributes
+    # Generate the URL to get 'key-name' from 'bucket-name'
+    url = S3.generate_presigned_url(
+        ClientMethod='put_object',
+        Params={
+            'Bucket': BUCKET,
+            'Key': key
+        }
+    )
+    return url
 
 
   @app.route('/users/balance/total-supply', cors=True, methods=['PUT'])
